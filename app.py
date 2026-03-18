@@ -1,21 +1,28 @@
 from flask import Flask, request, jsonify, send_from_directory
 import json
 import os
+from datetime import datetime
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-DATA_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data.json')
+DATA_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
-def load_data():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
+def load_json(name):
+    path = os.path.join(DATA_DIR, f'{name}.json')
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
             return json.load(f)
     return []
 
 
-def save_data(data):
-    with open(DATA_FILE, 'w', encoding='utf-8') as f:
+def save_json(name, data):
+    path = os.path.join(DATA_DIR, f'{name}.json')
+    with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
+
+
+def next_id(data):
+    return max((e.get('id', 0) for e in data), default=0) + 1
 
 
 @app.route('/')
@@ -23,40 +30,131 @@ def index():
     return send_from_directory('.', 'index.html')
 
 
-@app.route('/api/entries', methods=['GET'])
-def get_entries():
-    return jsonify(load_data())
+# --- Artikel ---
+
+@app.route('/api/articles', methods=['GET'])
+def get_articles():
+    return jsonify(load_json('articles'))
 
 
-@app.route('/api/entries', methods=['POST'])
-def create_entry():
+@app.route('/api/articles', methods=['POST'])
+def create_article():
     body = request.get_json()
-    data = load_data()
-    body['id'] = max((e.get('id', 0) for e in data), default=0) + 1
+    data = load_json('articles')
+    body['id'] = next_id(data)
+    body['stock'] = body.get('stock', 0)
+    body['created'] = datetime.now().isoformat()
     data.insert(0, body)
-    save_data(data)
+    save_json('articles', data)
     return jsonify(body), 201
 
 
-@app.route('/api/entries/<int:entry_id>', methods=['PUT'])
-def update_entry(entry_id):
+@app.route('/api/articles/<int:aid>', methods=['PUT'])
+def update_article(aid):
     body = request.get_json()
-    data = load_data()
+    data = load_json('articles')
     for i, e in enumerate(data):
-        if e.get('id') == entry_id:
-            body['id'] = entry_id
+        if e.get('id') == aid:
+            body['id'] = aid
+            body['created'] = e.get('created', '')
             data[i] = body
             break
-    save_data(data)
+    save_json('articles', data)
     return jsonify(body)
 
 
-@app.route('/api/entries/<int:entry_id>', methods=['DELETE'])
-def delete_entry(entry_id):
-    data = load_data()
-    data = [e for e in data if e.get('id') != entry_id]
-    save_data(data)
+@app.route('/api/articles/<int:aid>', methods=['DELETE'])
+def delete_article(aid):
+    data = load_json('articles')
+    data = [e for e in data if e.get('id') != aid]
+    save_json('articles', data)
     return jsonify({'ok': True})
+
+
+# --- Transaktionen (Belege) ---
+
+@app.route('/api/transactions', methods=['GET'])
+def get_transactions():
+    return jsonify(load_json('transactions'))
+
+
+@app.route('/api/transactions', methods=['POST'])
+def create_transaction():
+    body = request.get_json()
+    txns = load_json('transactions')
+    body['id'] = next_id(txns)
+    body['date'] = body.get('date', datetime.now().strftime('%Y-%m-%d'))
+    body['time'] = datetime.now().strftime('%H:%M')
+    txns.insert(0, body)
+    save_json('transactions', txns)
+
+    articles = load_json('articles')
+    for a in articles:
+        if a.get('id') == body.get('articleId'):
+            qty = body.get('quantity', 0)
+            if body.get('type') == 'in':
+                a['stock'] = a.get('stock', 0) + qty
+            else:
+                a['stock'] = max(0, a.get('stock', 0) - qty)
+            break
+    save_json('articles', articles)
+    return jsonify(body), 201
+
+
+# --- Ausgaben ---
+
+@app.route('/api/expenses', methods=['GET'])
+def get_expenses():
+    return jsonify(load_json('expenses'))
+
+
+@app.route('/api/expenses', methods=['POST'])
+def create_expense():
+    body = request.get_json()
+    data = load_json('expenses')
+    body['id'] = next_id(data)
+    body['date'] = body.get('date', datetime.now().strftime('%Y-%m-%d'))
+    data.insert(0, body)
+    save_json('expenses', data)
+    return jsonify(body), 201
+
+
+@app.route('/api/expenses/<int:eid>', methods=['DELETE'])
+def delete_expense(eid):
+    data = load_json('expenses')
+    data = [e for e in data if e.get('id') != eid]
+    save_json('expenses', data)
+    return jsonify({'ok': True})
+
+
+# --- Berichte ---
+
+@app.route('/api/reports', methods=['GET'])
+def get_reports():
+    articles = load_json('articles')
+    txns = load_json('transactions')
+    expenses = load_json('expenses')
+
+    total_stock = sum(a.get('stock', 0) for a in articles)
+    total_value = sum(a.get('stock', 0) * a.get('price', 0) for a in articles)
+    total_in = sum(t.get('quantity', 0) for t in txns if t.get('type') == 'in')
+    total_out = sum(t.get('quantity', 0) for t in txns if t.get('type') == 'out')
+    total_expenses = sum(e.get('amount', 0) for e in expenses)
+
+    low = [a for a in articles if 0 < a.get('stock', 0) <= a.get('minStock', 5)]
+    out = [a for a in articles if a.get('stock', 0) == 0]
+
+    return jsonify({
+        'totalArticles': len(articles),
+        'totalStock': total_stock,
+        'totalValue': total_value,
+        'totalIn': total_in,
+        'totalOut': total_out,
+        'totalExpenses': total_expenses,
+        'totalTransactions': len(txns),
+        'lowStock': low,
+        'outOfStock': out
+    })
 
 
 if __name__ == '__main__':
