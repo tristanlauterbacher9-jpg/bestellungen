@@ -376,11 +376,7 @@
 
 <!-- BELEGE -->
 <div class="pg" id="pg-bel">
-    <div class="tabs">
-        <button class="tab on" onclick="belFilter='all';renderBel();setTab(this)">Alle</button>
-        <button class="tab" onclick="belFilter='in';renderBel();setTab(this)">Eingänge</button>
-        <button class="tab" onclick="belFilter='out';renderBel();setTab(this)">Ausgänge</button>
-    </div>
+    <div class="tabs" id="belTabs"></div>
     <div class="sbar">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="belQ" placeholder="Belege suchen..." oninput="renderBel()">
@@ -537,7 +533,7 @@ async function api(u,m='GET',b=null){
 }
 async function loadAll(){
     [articles,transactions,expenses,customers,catstock]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses'),api('/api/customers'),api('/api/catstock')]);
-    if(currentPage==='dash')renderDash();
+    renderPage();
 }
 
 // === Helpers ===
@@ -590,7 +586,7 @@ function renderDash(){
     const outCount=catstock.filter(c=>(c.stock||0)===0).length;
 
     document.getElementById('dashStats').innerHTML=`
-        <div class="dash-stat"><div class="sv">${articles.length}</div><div class="sl">Artikel</div></div>
+        <div class="dash-stat"><div class="sv">${catstock.length}</div><div class="sl">Kategorien</div></div>
         <div class="dash-stat"><div class="sv" style="color:var(--accent)">${totalStock}</div><div class="sl">Bestand</div></div>
         <div class="dash-stat"><div class="sv" style="color:var(--blue)">${transactions.length}</div><div class="sl">Belege</div></div>`;
 
@@ -610,10 +606,11 @@ function renderArt(){
     const cats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(Boolean))];
     const tabsEl=document.getElementById('artTabs');
     if(cats.length>1){
-        tabsEl.innerHTML=`<button class="tab on" onclick="artCatFilter='';renderArt();setTab(this)">Alle (${articles.length})</button>`+
+        const af=window.artCatFilter||'';
+        tabsEl.innerHTML=`<button class="tab ${af?'':'on'}" onclick="artCatFilter='';renderArt()">Alle (${articles.length})</button>`+
             cats.map(c=>{
                 const st=getCatStock(c);
-                return`<button class="tab" onclick="artCatFilter='${c}';renderArt();setTab(this)">${esc(c)} (${st})</button>`;
+                return`<button class="tab ${af===c?'on':''}" onclick="artCatFilter='${c}';renderArt()">${esc(c)} (${st})</button>`;
             }).join('');
     }else tabsEl.innerHTML='';
 
@@ -639,8 +636,8 @@ function renderArt(){
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="li-stock ${cls}" style="font-size:1.1rem">${st}</span>
                     <div class="q-btns" style="margin:0">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','out').then(()=>renderArt())">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','in').then(()=>renderArt())">+</button>
+                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','out')">−</button>
+                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','in')">+</button>
                     </div>
                 </div>
             </div>`+
@@ -716,10 +713,10 @@ async function saveArt(){
         price:parseFloat(document.getElementById('iEK').value)||0,sellPrice:parseFloat(document.getElementById('iVK').value)||0};
     if(editId){await api('/api/articles/'+editId,'PUT',body);toast('Gespeichert')}
     else{await api('/api/articles','POST',body);toast('Artikel erstellt')}
-    cm(document.getElementById('mArt'));await loadAll();renderArt();
+    cm(document.getElementById('mArt'));await loadAll();
 }
 
-async function delArt(id){if(!confirm('Artikel löschen?'))return;await api('/api/articles/'+id,'DELETE');toast('Gelöscht');await loadAll();renderArt()}
+async function delArt(id){if(!confirm('Artikel löschen?'))return;await api('/api/articles/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
 // === EINGANG/AUSGANG ===
 function openStockModal(type,preselect,preselectCust){
@@ -806,10 +803,17 @@ async function saveStock(){
 
 // === BELEGE ===
 function renderBel(){
+    // Dynamic filter tabs with persisted state
+    const bf=belFilter||'all';
+    document.getElementById('belTabs').innerHTML=
+        `<button class="tab ${bf==='all'?'on':''}" onclick="belFilter='all';renderBel()">Alle</button>`+
+        `<button class="tab ${bf==='in'?'on':''}" onclick="belFilter='in';renderBel()">Eingänge</button>`+
+        `<button class="tab ${bf==='out'?'on':''}" onclick="belFilter='out';renderBel()">Ausgänge</button>`;
+
     const q=(document.getElementById('belQ').value||'').toLowerCase();
     let f=transactions;
     if(belFilter!=='all')f=f.filter(t=>t.type===belFilter);
-    f=f.filter(t=>(t.articleName||'').toLowerCase().includes(q)||(t.note||'').toLowerCase().includes(q));
+    f=f.filter(t=>(t.articleName||'').toLowerCase().includes(q)||(t.note||'').toLowerCase().includes(q)||(t.customerName||'').toLowerCase().includes(q));
 
     const list=document.getElementById('belList');
     if(!f.length){list.innerHTML='<div class="empty">Keine Belege</div>';return}
@@ -825,9 +829,14 @@ function renderBel(){
                     <div style="margin-top:4px;font-weight:800;font-size:1.05rem;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
                 </div>
             </div>
+            <div class="li-actions">
+                <button class="li-btn del" onclick="delTx(${t.id})">Löschen</button>
+            </div>
         </div>`;
     }).join('');
 }
+
+async function delTx(id){if(!confirm('Beleg löschen? Bestand wird zurückgerechnet.'))return;await api('/api/transactions/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
 // === AUSGABEN ===
 function openExpModal(){
@@ -839,10 +848,10 @@ async function saveExp(){
     const d=document.getElementById('iExpD').value.trim(),a=parseFloat(document.getElementById('iExpA').value)||0;
     if(!d){toast('Beschreibung eingeben');return}if(!a){toast('Betrag eingeben');return}
     await api('/api/expenses','POST',{description:d,amount:a});
-    toast('Ausgabe gespeichert');cm(document.getElementById('mExp'));await loadAll();renderExp();
+    toast('Ausgabe gespeichert');cm(document.getElementById('mExp'));await loadAll();
 }
 
-async function delExp(id){await api('/api/expenses/'+id,'DELETE');toast('Gelöscht');await loadAll();renderExp()}
+async function delExp(id){if(!confirm('Ausgabe löschen?'))return;await api('/api/expenses/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
 function renderExp(){
     const list=document.getElementById('expList');
@@ -880,7 +889,7 @@ async function renderRep(){
 // === KUNDEN ===
 function renderKunden(){
     const q=(document.getElementById('kundenQ').value||'').toLowerCase();
-    let filtered=customers.filter(c=>c.name.toLowerCase().includes(q)||(c.phone||'').includes(q)||(c.note||'').toLowerCase().includes(q));
+    let filtered=customers.filter(c=>c.name.toLowerCase().includes(q)||(c.note||'').toLowerCase().includes(q));
 
     const list=document.getElementById('kundenList');
     if(!filtered.length){list.innerHTML='<div class="empty">Keine Kunden'+(customers.length?'gefunden':'')+'</div>';return}
@@ -931,10 +940,10 @@ async function saveCust(){
     const body={name,note:document.getElementById('iCustNote').value.trim()};
     if(editCustId){await api('/api/customers/'+editCustId,'PUT',body);toast('Gespeichert')}
     else{await api('/api/customers','POST',body);toast('Kunde erstellt')}
-    cm(document.getElementById('mCust'));await loadAll();renderKunden();
+    cm(document.getElementById('mCust'));await loadAll();
 }
 
-async function delCust(id){if(!confirm('Kunde löschen?'))return;await api('/api/customers/'+id,'DELETE');toast('Gelöscht');await loadAll();renderKunden()}
+async function delCust(id){if(!confirm('Kunde löschen?'))return;await api('/api/customers/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
 function openCustDetail(id){
     window._custDetailId=id;
@@ -1043,8 +1052,8 @@ function renderBestand(){
                 <div class="cat-right">
                     <div class="cat-stock ${catCls}">${c.stock}</div>
                     <div class="q-btns" style="margin-left:8px">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','out').then(()=>renderBestand())">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','in').then(()=>renderBestand())">+</button>
+                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','out')">−</button>
+                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','in')">+</button>
                     </div>
                     <svg class="cat-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>

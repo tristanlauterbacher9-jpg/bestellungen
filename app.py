@@ -42,10 +42,24 @@ def create_article():
     body = request.get_json()
     data = load_json('articles')
     body['id'] = next_id(data)
-    body['stock'] = body.get('stock', 0)
+    body.pop('stock', None)
     body['created'] = datetime.now().isoformat()
     data.insert(0, body)
     save_json('articles', data)
+
+    # Auto-create catstock entry for new categories
+    cat = body.get('category', '')
+    if cat:
+        catstock = load_json('catstock')
+        if not any(cs.get('category') == cat for cs in catstock):
+            catstock.append({
+                'id': next_id(catstock),
+                'category': cat,
+                'stock': 0,
+                'minStock': 10
+            })
+            save_json('catstock', catstock)
+
     return jsonify(body), 201
 
 
@@ -66,8 +80,18 @@ def update_article(aid):
 @app.route('/api/articles/<int:aid>', methods=['DELETE'])
 def delete_article(aid):
     data = load_json('articles')
+    deleted = [e for e in data if e.get('id') == aid]
     data = [e for e in data if e.get('id') != aid]
     save_json('articles', data)
+
+    # Remove catstock if no more articles in that category
+    if deleted:
+        cat = deleted[0].get('category', '')
+        if cat and not any(a.get('category') == cat for a in data):
+            catstock = load_json('catstock')
+            catstock = [cs for cs in catstock if cs.get('category') != cat]
+            save_json('catstock', catstock)
+
     return jsonify({'ok': True})
 
 
@@ -119,6 +143,32 @@ def create_transaction():
         save_json('catstock', catstock)
 
     return jsonify(body), 201
+
+
+@app.route('/api/transactions/<int:tid>', methods=['DELETE'])
+def delete_transaction(tid):
+    txns = load_json('transactions')
+    deleted = [t for t in txns if t.get('id') == tid]
+    txns = [t for t in txns if t.get('id') != tid]
+    save_json('transactions', txns)
+
+    # Reverse the stock change
+    if deleted:
+        t = deleted[0]
+        cat_name = t.get('categoryName', '')
+        qty = t.get('quantity', 0)
+        if cat_name and qty:
+            catstock = load_json('catstock')
+            for cs in catstock:
+                if cs.get('category') == cat_name:
+                    if t.get('type') == 'in':
+                        cs['stock'] = max(0, cs.get('stock', 0) - qty)
+                    else:
+                        cs['stock'] = cs.get('stock', 0) + qty
+                    break
+            save_json('catstock', catstock)
+
+    return jsonify({'ok': True})
 
 
 # --- Ausgaben ---
