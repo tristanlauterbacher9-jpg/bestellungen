@@ -339,6 +339,8 @@
         <span id="warnText"></span>
     </div>
     <div class="dash-stats" id="dashStats"></div>
+    <div id="dashToday"></div>
+    <div id="dashRecent"></div>
     <div class="st">Aktionen</div>
     <div class="dash-grid">
         <div class="dash-card c-accent" onclick="nav('kat')">
@@ -545,9 +547,10 @@
         <div class="fg">
             <label>Kunde (optional)</label>
             <div style="display:flex;gap:6px">
-                <select id="iOutCust" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select>
+                <select id="iOutCust" onchange="showOutDiscount()" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select>
                 <button class="btn btn-c" style="flex:none;padding:10px 14px;white-space:nowrap" onclick="quickNewCust()">+ Neu</button>
             </div>
+            <div id="outDiscountInfo" style="display:none;margin-top:6px;font-size:.78rem;color:var(--accent);font-weight:600"></div>
         </div>
         <div class="fg"><label>Notiz (optional)</label><input type="text" id="iOutNote" placeholder="z.B. Abholung"></div>
         <button class="btn btn-p" onclick="saveOut()">Alles buchen</button>
@@ -573,6 +576,7 @@
         <div class="md-h"></div>
         <h2 id="mCustT">Neuer Kunde</h2>
         <div class="fg"><label>Name</label><input type="text" id="iCustName" placeholder="Kundenname"></div>
+        <div class="fg"><label>Rabatt % (optional)</label><input type="number" id="iCustDiscount" placeholder="0" min="0" max="100" step="1" inputmode="numeric"></div>
         <div class="fg"><label>Notiz (optional)</label><input type="text" id="iCustNote" placeholder="z.B. Stammkunde"></div>
         <button class="btn btn-p" onclick="saveCust()">Speichern</button>
         <button class="btn btn-c" onclick="cm(document.getElementById('mCust'))">Abbrechen</button>
@@ -603,15 +607,63 @@ let currentPage='dash',editId=null,editCustId=null,belFilter='all';
 
 const pNames={dash:'GZ.LAGER',kat:'Kategorien',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
+// === OFFLINE QUEUE ===
+let offlineQueue=JSON.parse(localStorage.getItem('offlineQueue')||'[]');
+let isOnline=navigator.onLine;
+
+window.addEventListener('online',()=>{isOnline=true;syncOfflineQueue()});
+window.addEventListener('offline',()=>{isOnline=false;toast('Offline — Buchungen werden gespeichert')});
+
+async function syncOfflineQueue(){
+    if(!offlineQueue.length)return;
+    toast('Synchronisiere '+offlineQueue.length+' Buchung(en)...');
+    const queue=[...offlineQueue];
+    offlineQueue=[];
+    localStorage.setItem('offlineQueue','[]');
+    for(const item of queue){
+        try{
+            await fetch(item.url,{method:item.method,headers:{'Content-Type':'application/json'},body:JSON.stringify(item.body)});
+        }catch(e){
+            offlineQueue.push(item);
+        }
+    }
+    if(offlineQueue.length){
+        localStorage.setItem('offlineQueue',JSON.stringify(offlineQueue));
+        toast(offlineQueue.length+' Buchung(en) noch ausstehend');
+    }else{
+        toast('Alle Buchungen synchronisiert');
+        await loadAll();
+    }
+}
+
 // === API ===
 async function api(u,m='GET',b=null){
     const o={method:m,headers:{'Content-Type':'application/json'}};
     if(b)o.body=JSON.stringify(b);
-    return(await fetch(u,o)).json();
+    try{
+        const res=await fetch(u,o);
+        return res.json();
+    }catch(e){
+        if(m!=='GET'&&b){
+            offlineQueue.push({url:u,method:m,body:b});
+            localStorage.setItem('offlineQueue',JSON.stringify(offlineQueue));
+            toast('Offline gespeichert — wird synchronisiert');
+            return b;
+        }
+        throw e;
+    }
 }
 async function loadAll(){
-    [articles,transactions,expenses,customers,catstock]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses'),api('/api/customers'),api('/api/catstock')]);
+    try{
+        [articles,transactions,expenses,customers,catstock]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses'),api('/api/customers'),api('/api/catstock')]);
+    }catch(e){
+        toast('Offline — zeige gecachte Daten');
+    }
     renderPage();
+    if(offlineQueue.length){
+        document.getElementById('warnText').textContent=offlineQueue.length+' Buchung(en) warten auf Sync';
+        document.getElementById('warnBanner').classList.add('vis');
+    }
 }
 
 // === Helpers ===
@@ -672,6 +724,36 @@ function renderDash(){
         document.getElementById('warnText').textContent=`${outCount?outCount+' ausverkauft':''}${outCount&&lowCount?' · ':''}${lowCount?lowCount+' niedriger Bestand':''}`;
         warn.classList.add('vis');
     }else warn.classList.remove('vis');
+
+    // Today's stats
+    const today=new Date().toISOString().slice(0,10);
+    const todayOut=transactions.filter(t=>t.type==='out'&&t.date===today);
+    const todayIn=transactions.filter(t=>t.type==='in'&&t.date===today);
+    let todayRevenue=0,todayCost=0;
+    todayOut.forEach(t=>{const cs=catstock.find(c=>c.category===(t.categoryName||''));todayRevenue+=(cs?cs.sellPrice||0:0)*(t.quantity||0)});
+    todayIn.forEach(t=>{const cs=catstock.find(c=>c.category===(t.categoryName||''));todayCost+=(cs?cs.price||0:0)*(t.quantity||0)});
+    const todayExp=expenses.filter(e=>e.date===today).reduce((s,e)=>s+(e.amount||0),0);
+    const todayProfit=todayRevenue-todayCost-todayExp;
+
+    document.getElementById('dashToday').innerHTML=`
+        <div class="rg" style="margin-bottom:14px">
+            <div class="rc"><div class="rl">Heute Umsatz</div><div class="rv" style="color:var(--green)">${money(todayRevenue)}</div></div>
+            <div class="rc"><div class="rl">Heute Profit</div><div class="rv" style="color:${todayProfit>=0?'var(--green)':'var(--red)'}">${money(todayProfit)}</div></div>
+        </div>`;
+
+    // Recent transactions (last 5)
+    const recent=transactions.slice(0,5);
+    document.getElementById('dashRecent').innerHTML=recent.length?`
+        <div class="st">Letzte Buchungen</div>
+        ${recent.map(t=>{const isIn=t.type==='in';return`<div class="li" style="padding:10px 14px;margin-bottom:4px">
+            <div class="li-top">
+                <div><div style="font-size:.82rem;font-weight:600">${esc(t.articleName||'?')}</div>
+                <div style="font-size:.68rem;color:var(--text2)">${fmtDate(t.date)} ${t.time||''}${t.belegNr?' · '+t.belegNr:''}</div></div>
+                <div style="font-weight:800;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
+            </div>
+        </div>`}).join('')}
+        <div style="text-align:center;margin:8px 0 14px"><button class="btn btn-c" style="padding:8px 20px;font-size:.78rem" onclick="nav('bel')">Alle Belege</button></div>
+    `:'';
 }
 
 // === KATEGORIEN ===
@@ -922,6 +1004,19 @@ function renderOutItems(){
     ).join('');
 }
 
+function showOutDiscount(){
+    const custId=parseInt(document.getElementById('iOutCust').value);
+    const info=document.getElementById('outDiscountInfo');
+    if(custId){
+        const c=customers.find(x=>x.id===custId);
+        if(c&&c.discount){
+            info.textContent='Rabatt: −'+c.discount+'% wird automatisch abgezogen';
+            info.style.display='';return;
+        }
+    }
+    info.style.display='none';
+}
+
 async function quickNewCust(){
     const name=prompt('Kundenname:');
     if(!name||!name.trim())return;
@@ -953,16 +1048,27 @@ async function saveOut(){
     const note=document.getElementById('iOutNote').value.trim();
     const date=document.getElementById('iOutDate').value;
     const custId=parseInt(document.getElementById('iOutCust').value);
-    let custName='';
-    if(custId){const c=customers.find(x=>x.id===custId);custName=c?c.name:''}
+    let custName='',discount=0;
+    if(custId){
+        const c=customers.find(x=>x.id===custId);
+        custName=c?c.name:'';
+        discount=c?c.discount||0:0;
+    }
 
     for(const item of outItemsList){
+        const cs=catstock.find(x=>x.category===item.cat);
+        const vk=cs?cs.sellPrice||0:0;
+        const linePrice=vk*item.qty;
+        const discountAmount=linePrice*(discount/100);
+        const finalPrice=linePrice-discountAmount;
+
         const body={type:'out',quantity:item.qty,note,date,categoryName:item.cat,
-            articleName:item.cat+' — '+item.name,articleId:item.aid};
+            articleName:item.cat+' — '+item.name,articleId:item.aid,
+            price:finalPrice,discount};
         if(custId){body.customerId=custId;body.customerName=custName}
         await api('/api/transactions','POST',body);
     }
-    toast(`${outItemsList.length} Position(en) gebucht`);
+    toast(`${outItemsList.length} Position(en) gebucht${discount?' (−'+discount+'% Rabatt)':''}`);
     cm(document.getElementById('mStockOut'));await loadAll();
 }
 
@@ -1195,13 +1301,15 @@ function renderKunden(){
     list.innerHTML=filtered.map(c=>{
         const initials=(c.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
         const txCount=transactions.filter(t=>t.customerId===c.id&&t.type==='out').length;
+        const bal=c.balance||0;
+        const disc=c.discount||0;
         return`<div class="li" onclick="openCustDetail(${c.id})" style="cursor:pointer">
             <div class="li-top">
                 <div style="display:flex;align-items:center;gap:12px">
                     <div class="cust-avatar">${esc(initials)}</div>
                     <div>
-                        <div class="li-name">${esc(c.name)}</div>
-                        <div class="li-sub">${txCount} Käufe${c.note?' · '+esc(c.note):''}</div>
+                        <div class="li-name">${esc(c.name)}${disc?' <span style="font-size:.68rem;color:var(--accent)">−'+disc+'%</span>':''}</div>
+                        <div class="li-sub">${txCount} Käufe${bal?(' · <span style="color:'+(bal<0?'var(--red)':'var(--green)')+'">'+money(bal)+'</span>'):''}</div>
                     </div>
                 </div>
                 <div class="li-right" style="display:flex;gap:6px">
@@ -1223,10 +1331,11 @@ function openCustModal(id){
     if(id){
         const c=customers.find(x=>x.id===id);if(!c)return;
         document.getElementById('iCustName').value=c.name||'';
+        document.getElementById('iCustDiscount').value=c.discount||'';
         document.getElementById('iCustNote').value=c.note||'';
         t.textContent='Kunde bearbeiten';
     }else{
-        ['iCustName','iCustNote'].forEach(x=>document.getElementById(x).value='');
+        ['iCustName','iCustNote','iCustDiscount'].forEach(x=>document.getElementById(x).value='');
         t.textContent='Neuer Kunde';
     }
     document.getElementById('mCust').classList.add('on');
@@ -1235,13 +1344,32 @@ function openCustModal(id){
 async function saveCust(){
     const name=document.getElementById('iCustName').value.trim();
     if(!name){toast('Name eingeben');return}
-    const body={name,note:document.getElementById('iCustNote').value.trim()};
-    if(editCustId){await api('/api/customers/'+editCustId,'PUT',body);toast('Gespeichert')}
-    else{await api('/api/customers','POST',body);toast('Kunde erstellt')}
+    const discount=parseInt(document.getElementById('iCustDiscount').value)||0;
+    const body={name,note:document.getElementById('iCustNote').value.trim(),discount};
+    if(editCustId){
+        const old=customers.find(x=>x.id===editCustId);
+        if(old)body.balance=old.balance||0;
+        await api('/api/customers/'+editCustId,'PUT',body);toast('Gespeichert');
+    }
+    else{body.balance=0;await api('/api/customers','POST',body);toast('Kunde erstellt')}
     cm(document.getElementById('mCust'));await loadAll();
 }
 
 async function delCust(id){if(!confirm('Kunde löschen?'))return;await api('/api/customers/'+id,'DELETE');toast('Gelöscht');await loadAll()}
+
+async function custAddBalance(id,dir){
+    const c=customers.find(x=>x.id===id);if(!c)return;
+    const label=dir>0?'Einzahlung':'Schulden';
+    const val=prompt(label+' Betrag (€):');
+    if(!val)return;
+    const amount=parseFloat(val.replace(',','.'));
+    if(isNaN(amount)||amount<=0){toast('Ungültiger Betrag');return}
+    const newBal=(c.balance||0)+(amount*dir);
+    await api('/api/customers/'+id,'PUT',{...c,balance:newBal});
+    toast(label+': '+money(amount));
+    await loadAll();
+    renderCustDetail(id);
+}
 
 function openCustDetail(id){
     window._custDetailId=id;
@@ -1256,12 +1384,26 @@ async function renderCustDetail(id){
     document.getElementById('custDetailContent').innerHTML='<div class="empty">Lade Daten...</div>';
     const s=await api('/api/customers/'+id+'/stats');
 
+    const bal=c.balance||0;
+    const disc=c.discount||0;
+
     document.getElementById('custDetailContent').innerHTML=`
         <div class="cust-detail-head">
             <div class="cust-avatar">${esc(initials)}</div>
             <h2>${esc(c.name)}</h2>
+            ${disc?'<div style="color:var(--accent);font-size:.82rem;font-weight:600">Rabatt: '+disc+'%</div>':''}
             ${c.note?'<div class="cust-phone">'+esc(c.note)+'</div>':''}
         </div>
+
+        <div class="rg" style="margin-bottom:14px">
+            <div class="rc"><div class="rl">Guthaben</div><div class="rv" style="color:${bal>=0?'var(--green)':'var(--red)'}">${money(bal)}</div></div>
+            <div class="rc"><div class="rl">Rabatt</div><div class="rv" style="color:var(--accent)">${disc}%</div></div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+            <button class="btn btn-p" style="flex:1;background:var(--green)" onclick="custAddBalance(${c.id},1)">+ Einzahlung</button>
+            <button class="btn btn-p" style="flex:1;background:var(--red)" onclick="custAddBalance(${c.id},-1)">− Schulden</button>
+        </div>
+
         <div class="st">Umsatz</div>
         <div class="cust-stats">
             <div class="cust-stat">
@@ -1336,16 +1478,28 @@ function renderBestand(){
 
         list.innerHTML=header+items.map(a=>{
             const st=a.stock||0;
-            return`<div class="bestand-row" style="flex-wrap:nowrap">
-                <div class="br-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</div>
-                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
-                    <button class="q-btn minus" onclick="adjArtStock(${a.id},-1)" style="width:30px;height:30px">−</button>
-                    <input type="number" inputmode="numeric" value="${st}" min="0"
-                        style="width:52px;text-align:center;font-size:1rem;font-weight:800;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:4px 2px;-moz-appearance:textfield"
-                        onchange="setArtStock(${a.id},this.value)"
-                        onfocus="this.select()">
-                    <button class="q-btn plus" onclick="adjArtStock(${a.id},1)" style="width:30px;height:30px">+</button>
+            const expanded=window._flavorHistory===a.id;
+            const artTxns=expanded?transactions.filter(t=>t.articleId===a.id).slice(0,15):[];
+            return`<div class="cat-card${expanded?' open':''}" style="margin-bottom:6px">
+                <div style="display:flex;align-items:center;padding:12px 16px;gap:8px">
+                    <div class="br-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="window._flavorHistory=window._flavorHistory===${a.id}?null:${a.id};renderBestand()">${esc(a.name)}</div>
+                    <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                        <button class="q-btn minus" onclick="event.stopPropagation();adjArtStock(${a.id},-1)" style="width:30px;height:30px">−</button>
+                        <input type="number" inputmode="numeric" value="${st}" min="0"
+                            style="width:52px;text-align:center;font-size:1rem;font-weight:800;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:4px 2px;-moz-appearance:textfield"
+                            onchange="setArtStock(${a.id},this.value)" onclick="event.stopPropagation()"
+                            onfocus="this.select()">
+                        <button class="q-btn plus" onclick="event.stopPropagation();adjArtStock(${a.id},1)" style="width:30px;height:30px">+</button>
+                    </div>
                 </div>
+                <div class="cat-items">${expanded?(artTxns.length?artTxns.map(t=>{
+                    const isIn=t.type==='in';
+                    return`<div class="cat-item">
+                        <div><div style="font-size:.78rem;font-weight:600;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'Eingang':'Ausgang'}</div>
+                        <div style="font-size:.68rem;color:var(--text2)">${fmtDate(t.date)} ${t.time||''}${t.customerName?' · '+esc(t.customerName):''}</div></div>
+                        <div style="font-weight:800;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
+                    </div>`;
+                }).join(''):'<div style="padding:12px 16px;font-size:.78rem;color:var(--text2)">Noch keine Buchungen</div>'):''}</div>
             </div>`;
         }).join('');
     }

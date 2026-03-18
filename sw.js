@@ -1,4 +1,4 @@
-const CACHE_NAME = 'gz-lager-v1';
+const CACHE_NAME = 'gz-lager-v2';
 const ASSETS = [
   '/',
   '/index.html',
@@ -26,18 +26,13 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: network first, fallback to cache
+// Fetch: network first, fallback to cache (including API GET for offline)
 self.addEventListener('fetch', e => {
-  // Skip non-GET requests
   if (e.request.method !== 'GET') return;
-
-  // API calls: network only (need fresh data)
-  if (e.request.url.includes('/api/')) return;
 
   e.respondWith(
     fetch(e.request)
       .then(res => {
-        // Cache successful responses
         if (res.ok) {
           const clone = res.clone();
           caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
