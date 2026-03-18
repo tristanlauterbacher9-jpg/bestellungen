@@ -88,16 +88,36 @@ def create_transaction():
     txns.insert(0, body)
     save_json('transactions', txns)
 
-    articles = load_json('articles')
-    for a in articles:
-        if a.get('id') == body.get('articleId'):
-            qty = body.get('quantity', 0)
-            if body.get('type') == 'in':
-                a['stock'] = a.get('stock', 0) + qty
-            else:
-                a['stock'] = max(0, a.get('stock', 0) - qty)
-            break
-    save_json('articles', articles)
+    # Update category stock
+    cat_name = body.get('categoryName', '')
+    if not cat_name:
+        articles = load_json('articles')
+        for a in articles:
+            if a.get('id') == body.get('articleId'):
+                cat_name = a.get('category', '')
+                break
+
+    if cat_name:
+        catstock = load_json('catstock')
+        found = False
+        qty = body.get('quantity', 0)
+        for cs in catstock:
+            if cs.get('category') == cat_name:
+                if body.get('type') == 'in':
+                    cs['stock'] = cs.get('stock', 0) + qty
+                else:
+                    cs['stock'] = max(0, cs.get('stock', 0) - qty)
+                found = True
+                break
+        if not found:
+            catstock.append({
+                'id': next_id(catstock),
+                'category': cat_name,
+                'stock': qty if body.get('type') == 'in' else 0,
+                'minStock': 10
+            })
+        save_json('catstock', catstock)
+
     return jsonify(body), 201
 
 
@@ -207,6 +227,33 @@ def customer_stats(cid):
     })
 
 
+# --- Kategorie-Bestand ---
+
+@app.route('/api/catstock', methods=['GET'])
+def get_catstock():
+    return jsonify(load_json('catstock'))
+
+
+@app.route('/api/catstock', methods=['POST'])
+def set_catstock():
+    body = request.get_json()
+    data = load_json('catstock')
+    found = False
+    for entry in data:
+        if entry.get('category') == body.get('category'):
+            entry['stock'] = body.get('stock', entry.get('stock', 0))
+            entry['minStock'] = body.get('minStock', entry.get('minStock', 10))
+            found = True
+            break
+    if not found:
+        body['id'] = next_id(data)
+        body.setdefault('stock', 0)
+        body.setdefault('minStock', 10)
+        data.append(body)
+    save_json('catstock', data)
+    return jsonify(body)
+
+
 # --- Berichte ---
 
 @app.route('/api/reports', methods=['GET'])
@@ -214,26 +261,26 @@ def get_reports():
     articles = load_json('articles')
     txns = load_json('transactions')
     expenses = load_json('expenses')
+    catstock = load_json('catstock')
 
-    total_stock = sum(a.get('stock', 0) for a in articles)
-    total_value = sum(a.get('stock', 0) * a.get('price', 0) for a in articles)
+    total_stock = sum(cs.get('stock', 0) for cs in catstock)
     total_in = sum(t.get('quantity', 0) for t in txns if t.get('type') == 'in')
     total_out = sum(t.get('quantity', 0) for t in txns if t.get('type') == 'out')
     total_expenses = sum(e.get('amount', 0) for e in expenses)
 
-    low = [a for a in articles if 0 < a.get('stock', 0) <= a.get('minStock', 5)]
-    out = [a for a in articles if a.get('stock', 0) == 0]
+    low = [cs for cs in catstock if 0 < cs.get('stock', 0) <= cs.get('minStock', 10)]
+    out = [cs for cs in catstock if cs.get('stock', 0) == 0]
 
     return jsonify({
         'totalArticles': len(articles),
         'totalStock': total_stock,
-        'totalValue': total_value,
         'totalIn': total_in,
         'totalOut': total_out,
         'totalExpenses': total_expenses,
         'totalTransactions': len(txns),
         'lowStock': low,
-        'outOfStock': out
+        'outOfStock': out,
+        'catstock': catstock
     })
 
 

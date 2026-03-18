@@ -469,10 +469,6 @@
             <div class="fg"><label>Einkaufspreis</label><input type="number" id="iEK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
             <div class="fg"><label>Verkaufspreis</label><input type="number" id="iVK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
         </div>
-        <div class="fg-row">
-            <div class="fg"><label>Bestand</label><input type="number" id="iStock" placeholder="0" min="0" inputmode="numeric"></div>
-            <div class="fg"><label>Mindestbestand</label><input type="number" id="iMin" placeholder="5" min="0" inputmode="numeric"></div>
-        </div>
         <button class="btn btn-p" onclick="saveArt()">Speichern</button>
         <button class="btn btn-c" onclick="cm(document.getElementById('mArt'))">Abbrechen</button>
     </div>
@@ -483,13 +479,8 @@
     <div class="md">
         <div class="md-h"></div>
         <h2 id="mStockT">Neuer Eingang</h2>
-        <!-- Eingang: flat article list -->
-        <div class="fg" id="fgArtFlat"><label>Artikel</label><select id="iStockArt"></select></div>
-        <!-- Ausgang: category → flavor -->
-        <div id="fgArtCat" style="display:none">
-            <div class="fg"><label>Kategorie / Produkt</label><select id="iStockCat" onchange="onStockCatChange()"></select></div>
-            <div class="fg"><label>Geschmack</label><select id="iStockFlavor"></select></div>
-        </div>
+        <div class="fg"><label>Kategorie / Produkt</label><select id="iStockCat" onchange="onStockCatChange()"></select></div>
+        <div class="fg" id="fgFlavor" style="display:none"><label>Geschmack</label><select id="iStockFlavor"></select></div>
         <div class="fg"><label>Datum</label><input type="date" id="iStockDate"></div>
         <div class="fg">
             <label>Menge</label>
@@ -533,7 +524,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-let articles=[],transactions=[],expenses=[],customers=[];
+let articles=[],transactions=[],expenses=[],customers=[],catstock=[];
 let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
 
 const pNames={dash:'Lager und Inventar',art:'Artikel',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
@@ -545,7 +536,7 @@ async function api(u,m='GET',b=null){
     return(await fetch(u,o)).json();
 }
 async function loadAll(){
-    [articles,transactions,expenses,customers]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses'),api('/api/customers')]);
+    [articles,transactions,expenses,customers,catstock]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses'),api('/api/customers'),api('/api/catstock')]);
     if(currentPage==='dash')renderDash();
 }
 
@@ -554,6 +545,8 @@ function esc(s){const d=document.createElement('div');d.textContent=s||'';return
 function money(n){return(n||0).toFixed(2).replace('.',',')+' \u20AC'}
 function fmtDate(d){if(!d)return'-';const[y,m,day]=d.split('-');return`${day}.${m}.${y}`}
 function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2000)}
+function getCatStock(catName){const cs=catstock.find(c=>c.category===catName);return cs?cs.stock||0:0}
+function getCatMinStock(catName){const cs=catstock.find(c=>c.category===catName);return cs?cs.minStock||10:10}
 function cm(el){el.classList.remove('on')}
 function setTab(el){el.parentElement.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));el.classList.add('on')}
 
@@ -592,9 +585,9 @@ function fabAction(){
 
 // === DASHBOARD ===
 function renderDash(){
-    const totalStock=articles.reduce((s,a)=>s+(a.stock||0),0);
-    const lowCount=articles.filter(a=>a.stock>0&&a.stock<=(a.minStock||5)).length;
-    const outCount=articles.filter(a=>(a.stock||0)===0).length;
+    const totalStock=catstock.reduce((s,c)=>s+(c.stock||0),0);
+    const lowCount=catstock.filter(c=>c.stock>0&&c.stock<=(c.minStock||10)).length;
+    const outCount=catstock.filter(c=>(c.stock||0)===0).length;
 
     document.getElementById('dashStats').innerHTML=`
         <div class="dash-stat"><div class="sv">${articles.length}</div><div class="sl">Artikel</div></div>
@@ -619,8 +612,8 @@ function renderArt(){
     if(cats.length>1){
         tabsEl.innerHTML=`<button class="tab on" onclick="artCatFilter='';renderArt();setTab(this)">Alle (${articles.length})</button>`+
             cats.map(c=>{
-                const cnt=articles.filter(a=>(a.category||'Sonstige')===c).length;
-                return`<button class="tab" onclick="artCatFilter='${c}';renderArt();setTab(this)">${esc(c)} (${cnt})</button>`;
+                const st=getCatStock(c);
+                return`<button class="tab" onclick="artCatFilter='${c}';renderArt();setTab(this)">${esc(c)} (${st})</button>`;
             }).join('');
     }else tabsEl.innerHTML='';
 
@@ -629,34 +622,46 @@ function renderArt(){
     const list=document.getElementById('artList');
     if(!filtered.length){list.innerHTML='<div class="empty">Keine Artikel gefunden</div>';return}
 
-    list.innerHTML=filtered.map(a=>{
-        const cls=a.stock===0?'out':a.stock<=(a.minStock||5)?'low':'ok';
-        return`<div class="li">
-            <div class="li-top">
-                <div><div class="li-name">${esc(a.name)}</div>
-                <div class="li-sub">${a.barcode?'<code>'+esc(a.barcode)+'</code> · ':''}${esc(a.category||'')}</div>
-                <div class="li-sub">EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div></div>
-                <div class="li-right">
-                    <div class="li-stock ${cls}">${a.stock}</div>
-                    <div class="q-btns">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock(${a.id},'out').then(()=>renderArt())">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock(${a.id},'in').then(()=>renderArt())">+</button>
+    // Group by category and show category stock
+    const grouped={};
+    filtered.forEach(a=>{const c=a.category||'Sonstige';if(!grouped[c])grouped[c]=[];grouped[c].push(a)});
+
+    list.innerHTML=Object.entries(grouped).map(([cat,items])=>{
+        const st=getCatStock(cat);
+        const min=getCatMinStock(cat);
+        const cls=st===0?'out':st<=min?'low':'ok';
+        return`<div style="margin-bottom:16px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+                <div>
+                    <span style="font-weight:700;font-size:.88rem">${esc(cat)}</span>
+                    <span style="font-size:.72rem;color:var(--text2);margin-left:6px">${items.length} Geschmäcker</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                    <span class="li-stock ${cls}" style="font-size:1.1rem">${st}</span>
+                    <div class="q-btns" style="margin:0">
+                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','out').then(()=>renderArt())">−</button>
+                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','in').then(()=>renderArt())">+</button>
                     </div>
                 </div>
-            </div>
-            <div class="li-actions">
-                <button class="li-btn edit" onclick="openArtModal(${a.id})">Bearbeiten</button>
-                <button class="li-btn del" onclick="delArt(${a.id})">Löschen</button>
-            </div>
-        </div>`;
+            </div>`+
+            items.map(a=>`<div class="li">
+                <div class="li-top">
+                    <div><div class="li-name">${esc(a.name)}</div>
+                    <div class="li-sub">${a.barcode?'<code>'+esc(a.barcode)+'</code> · ':''}EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div></div>
+                </div>
+                <div class="li-actions">
+                    <button class="li-btn edit" onclick="openArtModal(${a.id})">Bearbeiten</button>
+                    <button class="li-btn del" onclick="delArt(${a.id})">Löschen</button>
+                </div>
+            </div>`).join('')+
+        `</div>`;
     }).join('');
 }
 
-async function quickStock(id,type){
-    const a=articles.find(x=>x.id===id);
-    if(!a)return;
-    if(type==='out'&&a.stock<1){toast('Nicht auf Lager');return}
-    await api('/api/transactions','POST',{type,articleId:id,quantity:1,note:'Schnellbuchung',articleName:a.name});
+async function quickStock(catName,type){
+    const st=getCatStock(catName);
+    if(type==='out'&&st<1){toast('Nicht auf Lager');return}
+    await api('/api/transactions','POST',{type,quantity:1,note:'Schnellbuchung',categoryName:catName,articleName:catName});
     toast(type==='in'?'+1 gebucht':'−1 gebucht');
     await loadAll();
 }
@@ -671,24 +676,29 @@ function openArtModal(id,preCategory){
 
     // Build category dropdown from existing categories
     const cats=[...new Set(articles.map(a=>a.category).filter(Boolean))];
-    catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')+
-        '<option value="__new__">+ Neue Kategorie...</option>';
+
+    if(cats.length===0){
+        // No categories yet — show text input directly
+        catSel.style.display='none';
+        catNew.style.display='';
+        catNew.value='';
+    }else{
+        catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')+
+            '<option value="__new__">+ Neue Kategorie...</option>';
+    }
 
     if(id){
         const a=articles.find(x=>x.id===id);if(!a)return;
         document.getElementById('iBarcode').value=a.barcode||'';
         document.getElementById('iName').value=a.name||'';
-        catSel.value=a.category||'';
-        if(a.category&&!cats.includes(a.category)){catNew.value=a.category;catNew.style.display='';catSel.style.display='none'}
+        if(cats.includes(a.category)){catSel.value=a.category}
+        else{catNew.value=a.category||'';catNew.style.display='';catSel.style.display='none'}
         document.getElementById('iEK').value=a.price||'';
         document.getElementById('iVK').value=a.sellPrice||'';
-        document.getElementById('iStock').value=a.stock||0;
-        document.getElementById('iMin').value=a.minStock||5;
         t.textContent='Artikel bearbeiten';
     }else{
-        ['iBarcode','iName','iEK','iVK','iStock'].forEach(x=>document.getElementById(x).value='');
-        document.getElementById('iMin').value='5';
-        if(preCategory){catSel.value=preCategory}
+        ['iBarcode','iName','iEK','iVK'].forEach(x=>document.getElementById(x).value='');
+        if(preCategory&&cats.includes(preCategory)){catSel.value=preCategory}
         else if(cats.length){catSel.value=cats[0]}
         t.textContent='Neuer Artikel';
     }
@@ -703,8 +713,7 @@ async function saveArt(){
     const category=(catSel.value==='__new__'||catSel.style.display==='none')?catNew.value.trim():catSel.value;
     if(!category){toast('Kategorie wählen');return}
     const body={name,barcode:document.getElementById('iBarcode').value.trim(),category,
-        price:parseFloat(document.getElementById('iEK').value)||0,sellPrice:parseFloat(document.getElementById('iVK').value)||0,
-        stock:parseInt(document.getElementById('iStock').value)||0,minStock:parseInt(document.getElementById('iMin').value)||5};
+        price:parseFloat(document.getElementById('iEK').value)||0,sellPrice:parseFloat(document.getElementById('iVK').value)||0};
     if(editId){await api('/api/articles/'+editId,'PUT',body);toast('Gespeichert')}
     else{await api('/api/articles','POST',body);toast('Artikel erstellt')}
     cm(document.getElementById('mArt'));await loadAll();renderArt();
@@ -720,26 +729,25 @@ function openStockModal(type,preselect,preselectCust){
     document.getElementById('iStockNote').value='';
     document.getElementById('iStockDate').value=new Date().toISOString().slice(0,10);
 
-    const fgFlat=document.getElementById('fgArtFlat');
-    const fgCat=document.getElementById('fgArtCat');
+    const cats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(Boolean))];
+    const catSel=document.getElementById('iStockCat');
 
+    // If preselect is an article id, find its category
+    let preselectCat='';
+    if(preselect){const pa=articles.find(x=>x.id===preselect);if(pa)preselectCat=pa.category||'Sonstige'}
+
+    catSel.innerHTML=cats.map(c=>{
+        const st=getCatStock(c);
+        return`<option value="${esc(c)}"${c===preselectCat?' selected':''}>${esc(c)} (${st})</option>`;
+    }).join('');
+
+    // Show flavor picker for Ausgang
+    const fgFlavor=document.getElementById('fgFlavor');
     if(type==='out'){
-        // Ausgang: Category → Flavor
-        fgFlat.style.display='none';
-        fgCat.style.display='';
-        const cats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(Boolean))];
-        const catSel=document.getElementById('iStockCat');
-        // If preselect is an article id, find its category
-        let preselectCat='';
-        if(preselect){const pa=articles.find(x=>x.id===preselect);if(pa)preselectCat=pa.category||'Sonstige'}
-        catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}"${c===preselectCat?' selected':''}>${esc(c)}</option>`).join('');
+        fgFlavor.style.display='';
         onStockCatChange(preselect);
     }else{
-        // Eingang: flat list
-        fgFlat.style.display='';
-        fgCat.style.display='none';
-        const sel=document.getElementById('iStockArt');
-        sel.innerHTML=articles.map(a=>`<option value="${a.id}"${a.id===preselect?' selected':''}>${esc(a.name)} — ${esc(a.category||'')} (${a.stock})</option>`).join('');
+        fgFlavor.style.display='none';
     }
 
     // Customer select for Ausgang
@@ -749,7 +757,8 @@ function openStockModal(type,preselect,preselectCust){
         fgC.style.display='';
         custSel.innerHTML='<option value="">-- Kein Kunde --</option>'+customers.map(c=>`<option value="${c.id}"${c.id===preselectCust?' selected':''}>${esc(c.name)}</option>`).join('');
     }else{fgC.style.display='none'}
-    if(!articles.length){toast('Erst Artikel anlegen');return}
+
+    if(!cats.length){toast('Erst Kategorie mit Artikeln anlegen');return}
     document.getElementById('mStock').classList.add('on');
 }
 
@@ -757,26 +766,31 @@ function onStockCatChange(preselectId){
     const cat=document.getElementById('iStockCat').value;
     const flavors=articles.filter(a=>(a.category||'Sonstige')===cat);
     const sel=document.getElementById('iStockFlavor');
-    sel.innerHTML=flavors.map(a=>`<option value="${a.id}"${a.id===preselectId?' selected':''}>${esc(a.name)} (${a.stock})</option>`).join('');
+    sel.innerHTML=flavors.map(a=>`<option value="${a.id}"${a.id===preselectId?' selected':''}>${esc(a.name)}</option>`).join('');
 }
 
 function adjQty(d){stockQty=Math.max(1,stockQty+d);document.getElementById('qtyVal').textContent=stockQty}
 
 async function saveStock(){
-    let aid;
-    if(stockType==='out'){
-        aid=parseInt(document.getElementById('iStockFlavor').value);
-    }else{
-        aid=parseInt(document.getElementById('iStockArt').value);
-    }
+    const catName=document.getElementById('iStockCat').value;
     const note=document.getElementById('iStockNote').value.trim();
     const date=document.getElementById('iStockDate').value;
-    const a=articles.find(x=>x.id===aid);
-    if(stockType==='out'&&a&&a.stock<stockQty){toast('Nicht genug auf Lager ('+a.stock+')');return}
-    const body={type:stockType,articleId:aid,quantity:stockQty,note,date,articleName:a?a.name:''};
+    const catStockVal=getCatStock(catName);
+
+    if(stockType==='out'&&catStockVal<stockQty){toast('Nicht genug auf Lager ('+catStockVal+')');return}
+
+    let aid=null,flavorName='';
     if(stockType==='out'){
-        // Set articleName as "Category — Flavor"
-        body.articleName=(a?(a.category||''):'') +' — '+(a?a.name:'');
+        aid=parseInt(document.getElementById('iStockFlavor').value);
+        const a=articles.find(x=>x.id===aid);
+        flavorName=a?a.name:'';
+    }
+
+    const body={type:stockType,quantity:stockQty,note,date,categoryName:catName,
+        articleName:stockType==='out'?catName+' — '+flavorName:catName,
+        articleId:aid};
+
+    if(stockType==='out'){
         const custId=parseInt(document.getElementById('iStockCust').value);
         if(custId){
             const c=customers.find(x=>x.id===custId);
@@ -784,6 +798,7 @@ async function saveStock(){
             body.customerName=c?c.name:'';
         }
     }
+
     await api('/api/transactions','POST',body);
     toast(stockType==='in'?`+${stockQty} gebucht`:`−${stockQty} gebucht`);
     cm(document.getElementById('mStock'));await loadAll();
@@ -845,25 +860,21 @@ function renderExp(){
 // === BERICHTE ===
 async function renderRep(){
     const r=await api('/api/reports');
-    const totalSellVal=articles.reduce((s,a)=>s+(a.stock||0)*(a.sellPrice||0),0);
-    const profit=totalSellVal-r.totalValue;
     document.getElementById('repContent').innerHTML=`
         <div class="rg">
-            <div class="rc"><div class="rl">Artikel</div><div class="rv">${r.totalArticles}</div></div>
+            <div class="rc"><div class="rl">Kategorien</div><div class="rv">${(r.catstock||[]).length}</div></div>
             <div class="rc"><div class="rl">Gesamtbestand</div><div class="rv">${r.totalStock}</div></div>
-            <div class="rc"><div class="rl">Lagerwert EK</div><div class="rv" style="color:var(--accent)">${money(r.totalValue)}</div></div>
-            <div class="rc"><div class="rl">Lagerwert VK</div><div class="rv" style="color:var(--blue)">${money(totalSellVal)}</div></div>
-            <div class="rc"><div class="rl">Marge</div><div class="rv" style="color:${profit>=0?'var(--green)':'var(--red)'}">${money(profit)}</div></div>
+            <div class="rc"><div class="rl">Geschmäcker</div><div class="rv">${r.totalArticles}</div></div>
             <div class="rc"><div class="rl">Ausgaben</div><div class="rv" style="color:var(--red)">${money(r.totalExpenses)}</div></div>
         </div>
         <div class="rg">
             <div class="rc"><div class="rl">Eingänge</div><div class="rv" style="color:var(--green)">+${r.totalIn}</div></div>
             <div class="rc"><div class="rl">Ausgänge</div><div class="rv" style="color:var(--red)">−${r.totalOut}</div></div>
         </div>
-        ${r.outOfStock.length?`<div class="st">Ausverkauft</div>${r.outOfStock.map(a=>`<div class="li"><div class="li-top">
-            <div><div class="li-name">${esc(a.name)}</div></div><div class="li-stock out">0</div></div></div>`).join('')}`:''}
-        ${r.lowStock.length?`<div class="st">Niedriger Bestand</div>${r.lowStock.map(a=>`<div class="li"><div class="li-top">
-            <div><div class="li-name">${esc(a.name)}</div></div><div class="li-stock low">${a.stock}</div></div></div>`).join('')}`:''}`;
+        ${r.outOfStock.length?`<div class="st">Ausverkauft</div>${r.outOfStock.map(c=>`<div class="li"><div class="li-top">
+            <div><div class="li-name">${esc(c.category)}</div></div><div class="li-stock out">0</div></div></div>`).join('')}`:''}
+        ${r.lowStock.length?`<div class="st">Niedriger Bestand</div>${r.lowStock.map(c=>`<div class="li"><div class="li-top">
+            <div><div class="li-name">${esc(c.category)}</div></div><div class="li-stock low">${c.stock}</div></div></div>`).join('')}`:''}`;
 }
 
 // === KUNDEN ===
@@ -979,76 +990,72 @@ async function renderCustDetail(id){
 // === BESTAND ===
 function renderBestand(){
     const q=(document.getElementById('bestandQ').value||'').toLowerCase();
-    const totalStock=articles.reduce((s,a)=>s+(a.stock||0),0);
-    const totalArticles=articles.length;
-    const totalEK=articles.reduce((s,a)=>s+(a.stock||0)*(a.price||0),0);
-    const totalVK=articles.reduce((s,a)=>s+(a.stock||0)*(a.sellPrice||0),0);
+    const totalStock=catstock.reduce((s,c)=>s+(c.stock||0),0);
+    const totalCats=catstock.length;
 
     document.getElementById('bestandTotal').innerHTML=`
         <div class="bt-val">${totalStock}</div>
         <div class="bt-lbl">Gesamtbestand</div>
-        <div class="bt-sub">${totalArticles} Artikel · EK ${money(totalEK)} · VK ${money(totalVK)}</div>`;
+        <div class="bt-sub">${totalCats} Kategorien · ${articles.length} Geschmäcker</div>`;
 
-    // Group by category
-    const catMap={};
-    articles.forEach(a=>{
-        const cat=a.category||'Sonstige';
-        if(!catMap[cat])catMap[cat]={name:cat,items:[],totalStock:0};
-        catMap[cat].items.push(a);
-        catMap[cat].totalStock+=(a.stock||0);
+    // Build category list from catstock + articles
+    let catList=catstock.map(cs=>{
+        const items=articles.filter(a=>(a.category||'Sonstige')===cs.category);
+        return{name:cs.category,stock:cs.stock||0,minStock:cs.minStock||10,items};
     });
-    let cats=Object.values(catMap).sort((a,b)=>b.totalStock-a.totalStock);
+
+    // Add categories from articles that have no catstock entry yet
+    const catsWithStock=new Set(catstock.map(c=>c.category));
+    const extraCats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(c=>!catsWithStock.has(c)))];
+    extraCats.forEach(cat=>{
+        catList.push({name:cat,stock:0,minStock:10,items:articles.filter(a=>(a.category||'Sonstige')===cat)});
+    });
+
+    catList.sort((a,b)=>b.stock-a.stock);
 
     // Filter
     if(q){
-        cats=cats.map(c=>{
+        catList=catList.map(c=>{
             const nameMatch=c.name.toLowerCase().includes(q);
             const filteredItems=c.items.filter(a=>a.name.toLowerCase().includes(q)||(a.barcode||'').includes(q));
             if(nameMatch)return c;
-            if(filteredItems.length)return{...c,items:filteredItems,totalStock:filteredItems.reduce((s,a)=>s+(a.stock||0),0)};
+            if(filteredItems.length)return{...c,items:filteredItems};
             return null;
         }).filter(Boolean);
     }
 
     const list=document.getElementById('bestandList');
-    if(!cats.length){list.innerHTML='<div class="empty">Keine Kategorien gefunden</div>';return}
+    if(!catList.length){list.innerHTML='<div class="empty">Keine Kategorien gefunden</div>';return}
 
-    const maxCatStock=Math.max(...cats.map(c=>c.totalStock),1);
+    const maxCatStock=Math.max(...catList.map(c=>c.stock),1);
 
-    list.innerHTML=cats.map((c,ci)=>{
-        const catCls=c.totalStock===0?'out':c.items.some(a=>a.stock<=( a.minStock||5)&&a.stock>0)?'low':'ok';
+    list.innerHTML=catList.map((c,ci)=>{
+        const catCls=c.stock===0?'out':c.stock<=c.minStock?'low':'ok';
         const barColor=catCls==='out'?'var(--red)':catCls==='low'?'var(--orange)':'var(--green)';
-        const barPct=Math.round((c.totalStock/maxCatStock)*100);
-        const sorted=[...c.items].sort((a,b)=>(b.stock||0)-(a.stock||0));
+        const barPct=Math.round((c.stock/maxCatStock)*100);
 
         return`<div class="cat-card" id="cat-${ci}">
             <div class="cat-header" onclick="toggleCat(${ci})">
                 <div>
                     <div class="cat-name">${esc(c.name)}</div>
-                    <div class="cat-count">${c.items.length} Artikel</div>
+                    <div class="cat-count">${c.items.length} Geschmäcker</div>
                 </div>
                 <div class="cat-right">
-                    <div class="cat-stock ${catCls}">${c.totalStock}</div>
+                    <div class="cat-stock ${catCls}">${c.stock}</div>
+                    <div class="q-btns" style="margin-left:8px">
+                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','out').then(()=>renderBestand())">−</button>
+                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','in').then(()=>renderBestand())">+</button>
+                    </div>
                     <svg class="cat-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
             </div>
             <div class="bestand-bar"><div class="bestand-bar-fill" style="width:${barPct}%;background:${barColor}"></div></div>
-            <div class="cat-items">${sorted.map(a=>{
-                const cls=a.stock===0?'out':a.stock<=(a.minStock||5)?'low':'ok';
-                return`<div class="cat-item">
+            <div class="cat-items">${c.items.map(a=>`<div class="cat-item">
                     <div>
                         <div class="ci-name">${esc(a.name)}</div>
                         <div class="ci-price">EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div>
                     </div>
-                    <div style="text-align:right">
-                        <div class="ci-stock ${cls}">${a.stock}</div>
-                        <div class="q-btns" style="margin-top:2px">
-                            <button class="q-btn minus" onclick="event.stopPropagation();quickStock(${a.id},'out').then(()=>renderBestand())">−</button>
-                            <button class="q-btn plus" onclick="event.stopPropagation();quickStock(${a.id},'in').then(()=>renderBestand())">+</button>
-                        </div>
-                    </div>
-                </div>`;
-            }).join('')}</div>
+                </div>`).join('')}</div>
         </div>`;
     }).join('');
 }
@@ -1077,17 +1084,19 @@ function onScan(code){
     const res=document.getElementById('scanRes');
 
     if(a){
-        const cls=a.stock===0?'out':a.stock<=(a.minStock||5)?'low':'ok';
+        const cat=a.category||'Sonstige';
+        const st=getCatStock(cat);
+        const cls=st===0?'out':st<=getCatMinStock(cat)?'low':'ok';
         res.innerHTML=`<div class="scan-res">
             <div style="font-size:.75rem;color:var(--text2)">Artikel gefunden</div>
             <div class="scan-code">${esc(code)}</div>
             <div class="scan-det">
-                <div class="li-name">${esc(a.name)}</div>
-                <div class="li-sub" style="margin-top:4px">${esc(a.category||'')} · VK ${money(a.sellPrice||0)}</div>
-                <div style="margin-top:8px;font-weight:700">Bestand: <span class="li-stock ${cls}">${a.stock}</span></div>
+                <div class="li-name">${esc(cat)}</div>
+                <div class="li-sub" style="margin-top:4px">${esc(a.name)} · VK ${money(a.sellPrice||0)}</div>
+                <div style="margin-top:8px;font-weight:700">Kategorie-Bestand: <span class="li-stock ${cls}">${st}</span></div>
             </div>
             <div class="scan-acts">
-                <button class="btn btn-p" onclick="scanBook(${a.id},'in')">+ Eingang</button>
+                <button class="btn btn-p" onclick="scanBook('${cat.replace(/'/g,"\\'")}','in')">+ Eingang</button>
                 <button class="btn btn-c" onclick="scanSell(${a.id})">Verkauf buchen</button>
             </div>
             <button class="btn btn-c" onclick="resumeScan()">Weiter scannen</button>
@@ -1107,10 +1116,10 @@ function onScan(code){
 
 function resumeScan(){document.getElementById('scanRes').innerHTML='';if(scanner&&scanRunning)scanner.resume()}
 
-async function scanBook(id,type){
-    const a=articles.find(x=>x.id===id);
-    if(type==='out'&&a&&a.stock<1){toast('Nicht auf Lager');return}
-    await api('/api/transactions','POST',{type,articleId:id,quantity:1,note:'Scan',articleName:a?a.name:''});
+async function scanBook(catName,type){
+    const st=getCatStock(catName);
+    if(type==='out'&&st<1){toast('Nicht auf Lager');return}
+    await api('/api/transactions','POST',{type,quantity:1,note:'Scan',categoryName:catName,articleName:catName});
     toast(type==='in'?'+1 gebucht':'−1 gebucht');
     await loadAll();resumeScan();
 }
