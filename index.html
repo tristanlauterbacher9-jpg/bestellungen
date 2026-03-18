@@ -171,6 +171,8 @@
             background:var(--card2);border-radius:20px;padding:6px 16px;
             font-size:.88rem;font-weight:700;min-width:50px;text-align:center;
         }
+        .bestand-row input[type=number]::-webkit-inner-spin-button,
+        .bestand-row input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 
         /* === CAT CARDS (for Kategorien page) === */
         .cat-card{
@@ -1302,7 +1304,10 @@ function renderBestand(){
                 <div class="br-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</div>
                 <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
                     <button class="q-btn minus" onclick="adjArtStock(${a.id},-1)" style="width:30px;height:30px">−</button>
-                    <div style="font-size:1rem;font-weight:800;min-width:30px;text-align:center;cursor:pointer" onclick="editArtStockPrompt(${a.id})">${st}</div>
+                    <input type="number" inputmode="numeric" value="${st}" min="0"
+                        style="width:52px;text-align:center;font-size:1rem;font-weight:800;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:4px 2px;-moz-appearance:textfield"
+                        onchange="setArtStock(${a.id},this.value)"
+                        onfocus="this.select()">
                     <button class="q-btn plus" onclick="adjArtStock(${a.id},1)" style="width:30px;height:30px">+</button>
                 </div>
             </div>`;
@@ -1320,15 +1325,14 @@ async function adjArtStock(id,delta){
     await loadAll();
 }
 
-function editArtStockPrompt(id){
+async function setArtStock(id,val){
     const a=articles.find(x=>x.id===id);if(!a)return;
-    const val=prompt('Bestand für '+a.name+' setzen:',(a.stock||0));
-    if(val===null)return;
     const num=parseInt(val);
     if(isNaN(num)||num<0){toast('Ungültige Zahl');return}
-    api('/api/articles/'+id,'PUT',{...a,stock:num})
-        .then(()=>syncCatStock(a.category))
-        .then(()=>{toast('Bestand: '+num);return loadAll()});
+    await api('/api/articles/'+id,'PUT',{...a,stock:num});
+    await syncCatStock(a.category);
+    toast('Bestand: '+num);
+    await loadAll();
 }
 
 async function syncCatStock(catName){
