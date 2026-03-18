@@ -478,7 +478,14 @@
     <div class="md">
         <div class="md-h"></div>
         <h2 id="mStockT">Neuer Eingang</h2>
-        <div class="fg"><label>Artikel</label><select id="iStockArt"></select></div>
+        <!-- Eingang: flat article list -->
+        <div class="fg" id="fgArtFlat"><label>Artikel</label><select id="iStockArt"></select></div>
+        <!-- Ausgang: category → flavor -->
+        <div id="fgArtCat" style="display:none">
+            <div class="fg"><label>Kategorie / Produkt</label><select id="iStockCat" onchange="onStockCatChange()"></select></div>
+            <div class="fg"><label>Geschmack</label><select id="iStockFlavor"></select></div>
+        </div>
+        <div class="fg"><label>Datum</label><input type="date" id="iStockDate"></div>
         <div class="fg">
             <label>Menge</label>
             <div class="qty-pick">
@@ -687,11 +694,33 @@ async function delArt(id){if(!confirm('Artikel löschen?'))return;await api('/ap
 function openStockModal(type,preselect,preselectCust){
     stockType=type;stockQty=1;
     document.getElementById('mStockT').textContent=type==='in'?'Neuer Eingang':'Neuer Ausgang';
-    const sel=document.getElementById('iStockArt');
-    sel.innerHTML=articles.map(a=>`<option value="${a.id}"${a.id===preselect?' selected':''}>${esc(a.name)} (${a.stock})</option>`).join('');
     document.getElementById('qtyVal').textContent='1';
     document.getElementById('iStockNote').value='';
-    // Show customer select for Ausgang
+    document.getElementById('iStockDate').value=new Date().toISOString().slice(0,10);
+
+    const fgFlat=document.getElementById('fgArtFlat');
+    const fgCat=document.getElementById('fgArtCat');
+
+    if(type==='out'){
+        // Ausgang: Category → Flavor
+        fgFlat.style.display='none';
+        fgCat.style.display='';
+        const cats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(Boolean))];
+        const catSel=document.getElementById('iStockCat');
+        // If preselect is an article id, find its category
+        let preselectCat='';
+        if(preselect){const pa=articles.find(x=>x.id===preselect);if(pa)preselectCat=pa.category||'Sonstige'}
+        catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}"${c===preselectCat?' selected':''}>${esc(c)}</option>`).join('');
+        onStockCatChange(preselect);
+    }else{
+        // Eingang: flat list
+        fgFlat.style.display='';
+        fgCat.style.display='none';
+        const sel=document.getElementById('iStockArt');
+        sel.innerHTML=articles.map(a=>`<option value="${a.id}"${a.id===preselect?' selected':''}>${esc(a.name)} — ${esc(a.category||'')} (${a.stock})</option>`).join('');
+    }
+
+    // Customer select for Ausgang
     const fgC=document.getElementById('fgCust');
     const custSel=document.getElementById('iStockCust');
     if(type==='out'){
@@ -702,15 +731,30 @@ function openStockModal(type,preselect,preselectCust){
     document.getElementById('mStock').classList.add('on');
 }
 
+function onStockCatChange(preselectId){
+    const cat=document.getElementById('iStockCat').value;
+    const flavors=articles.filter(a=>(a.category||'Sonstige')===cat);
+    const sel=document.getElementById('iStockFlavor');
+    sel.innerHTML=flavors.map(a=>`<option value="${a.id}"${a.id===preselectId?' selected':''}>${esc(a.name)} (${a.stock})</option>`).join('');
+}
+
 function adjQty(d){stockQty=Math.max(1,stockQty+d);document.getElementById('qtyVal').textContent=stockQty}
 
 async function saveStock(){
-    const aid=parseInt(document.getElementById('iStockArt').value);
+    let aid;
+    if(stockType==='out'){
+        aid=parseInt(document.getElementById('iStockFlavor').value);
+    }else{
+        aid=parseInt(document.getElementById('iStockArt').value);
+    }
     const note=document.getElementById('iStockNote').value.trim();
+    const date=document.getElementById('iStockDate').value;
     const a=articles.find(x=>x.id===aid);
     if(stockType==='out'&&a&&a.stock<stockQty){toast('Nicht genug auf Lager ('+a.stock+')');return}
-    const body={type:stockType,articleId:aid,quantity:stockQty,note,articleName:a?a.name:''};
+    const body={type:stockType,articleId:aid,quantity:stockQty,note,date,articleName:a?a.name:''};
     if(stockType==='out'){
+        // Set articleName as "Category — Flavor"
+        body.articleName=(a?(a.category||''):'') +' — '+(a?a.name:'');
         const custId=parseInt(document.getElementById('iStockCust').value);
         if(custId){
             const c=customers.find(x=>x.id===custId);
@@ -1022,7 +1066,7 @@ function onScan(code){
             </div>
             <div class="scan-acts">
                 <button class="btn btn-p" onclick="scanBook(${a.id},'in')">+ Eingang</button>
-                <button class="btn btn-c" onclick="scanBook(${a.id},'out')">− Ausgang</button>
+                <button class="btn btn-c" onclick="scanSell(${a.id})">Verkauf buchen</button>
             </div>
             <button class="btn btn-c" onclick="resumeScan()">Weiter scannen</button>
         </div>`;
@@ -1047,6 +1091,12 @@ async function scanBook(id,type){
     await api('/api/transactions','POST',{type,articleId:id,quantity:1,note:'Scan',articleName:a?a.name:''});
     toast(type==='in'?'+1 gebucht':'−1 gebucht');
     await loadAll();resumeScan();
+}
+
+function scanSell(id){
+    stopScanner();
+    nav('dash');
+    setTimeout(()=>openStockModal('out',id),200);
 }
 
 function newFromScan(code){
