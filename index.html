@@ -1329,6 +1329,7 @@ function onScan(code){
     }else{
         // Unbekannt — versuche automatische Zuordnung per Barcode-Prefix
         const match=findBarcodeMatch(code);
+        const cats=catstock.map(c=>c.category);
         if(match){
             // Gleicher Barcode-Prefix wie ein bekanntes Produkt → gleiche Kategorie
             const cat=match.category;
@@ -1340,32 +1341,42 @@ function onScan(code){
                     <div style="font-size:.82rem;color:var(--text2)">Barcode ähnlich wie ${esc(match.name)}</div>
                     <div style="margin-top:6px;font-weight:700">Bestand: ${st}</div>
                 </div>
-                <div class="st" style="margin:12px 0 8px">Barcode zuweisen an:</div>
+                <div class="st" style="margin:12px 0 8px">Bestehendem Geschmack zuweisen:</div>
                 <div id="scanAssignList">${articles.filter(x=>x.category===cat).map(x=>
                     `<div class="bestand-row" style="cursor:pointer;margin-bottom:4px" onclick="assignBarcode(${x.id},'${code.replace(/'/g,"\\'")}')">
                         <div class="br-name">${esc(x.name)}</div>
                         <div style="font-size:.7rem;color:var(--accent)">Zuweisen</div>
                     </div>`
                 ).join('')}</div>
+                <div class="st" style="margin:12px 0 8px">Oder als neuen Geschmack speichern:</div>
+                <div class="fg" style="margin-bottom:8px">
+                    <input type="text" id="scanNewFlavor" placeholder="Geschmacksname eingeben..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem">
+                </div>
+                <button class="btn btn-p" onclick="saveNewFlavorFromScan('${cat.replace(/'/g,"\\'")}','${code.replace(/'/g,"\\'")}')">Neuen Geschmack speichern</button>
                 <button class="btn btn-c" style="margin-top:8px" onclick="resumeScan()">Abbrechen</button>
             </div>`;
         }else{
-            // Komplett unbekannt — Kategorie + Geschmack wählen
-            const cats=catstock.map(c=>c.category);
+            // Komplett unbekannt — Kategorie + Geschmack wählen oder neu anlegen
             res.innerHTML=`<div class="scan-res">
-                <div style="font-size:.75rem;color:var(--orange)">Unbekannter Barcode</div>
+                <div style="font-size:.75rem;color:var(--orange)">Neuer Barcode erkannt</div>
                 <div class="scan-code">${esc(code)}</div>
-                <div class="st" style="margin:10px 0 6px">Zuweisen an Kategorie & Geschmack:</div>
+                <div class="st" style="margin:10px 0 6px">Kategorie wählen:</div>
                 <div class="fg" style="margin-bottom:8px">
                     <select id="scanCatSel" onchange="updateScanFlavors()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem">
                         ${cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
                     </select>
                 </div>
+                <div class="st" style="margin:10px 0 6px">Bestehendem Geschmack zuweisen:</div>
                 <div class="fg" style="margin-bottom:10px">
                     <select id="scanFlavorSel" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select>
                 </div>
-                <button class="btn btn-p" onclick="assignBarcodeFromScan('${code.replace(/'/g,"\\'")}')">Barcode zuweisen</button>
-                <button class="btn btn-c" onclick="resumeScan()">Abbrechen</button>
+                <button class="btn btn-p" onclick="assignBarcodeFromScan('${code.replace(/'/g,"\\'")}')">Bestehendem zuweisen</button>
+                <div class="st" style="margin:12px 0 6px">Oder als neuen Geschmack speichern:</div>
+                <div class="fg" style="margin-bottom:8px">
+                    <input type="text" id="scanNewFlavor" placeholder="Geschmacksname eingeben..." style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem">
+                </div>
+                <button class="btn btn-p" onclick="saveNewFlavorFromScanUnknown('${code.replace(/'/g,"\\'")}')">Neuen Geschmack speichern</button>
+                <button class="btn btn-c" style="margin-top:8px" onclick="resumeScan()">Abbrechen</button>
             </div>`;
             if(cats.length)updateScanFlavors();
         }
@@ -1410,6 +1421,26 @@ async function assignBarcodeFromScan(code){
     const artId=parseInt(document.getElementById('scanFlavorSel').value);
     if(!artId){toast('Geschmack wählen');return}
     await assignBarcode(artId,code);
+}
+
+async function saveNewFlavorFromScan(cat,code){
+    const name=(document.getElementById('scanNewFlavor').value||'').trim();
+    if(!name){toast('Geschmacksname eingeben');return}
+    const body={name,category:cat,barcode:code};
+    await api('/api/articles','POST',body);
+    toast('Neuer Geschmack gespeichert: '+name);
+    await loadAll();resumeScan();
+}
+
+async function saveNewFlavorFromScanUnknown(code){
+    const cat=(document.getElementById('scanCatSel').value||'').trim();
+    if(!cat){toast('Kategorie wählen');return}
+    const name=(document.getElementById('scanNewFlavor').value||'').trim();
+    if(!name){toast('Geschmacksname eingeben');return}
+    const body={name,category:cat,barcode:code};
+    await api('/api/articles','POST',body);
+    toast('Neuer Geschmack gespeichert: '+name);
+    await loadAll();resumeScan();
 }
 
 function resumeScan(){document.getElementById('scanRes').innerHTML='';if(scanner&&scanRunning)scanner.resume()}
