@@ -2,3 +2,12 @@ __pycache__/
 *.pyc
 bestellbuch_app/
 mobile-bestellbuch/
+gen_icon.py
+
+# Data files (now stored in PostgreSQL)
+articles.json
+transactions.json
+expenses.json
+customers.json
+catstock.json
+data.json

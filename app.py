@@ -1,28 +1,71 @@
 from flask import Flask, request, jsonify, send_from_directory
 import json
 import os
+import psycopg2
 from datetime import datetime, timedelta
 
 app = Flask(__name__, static_folder='.', static_url_path='')
-DATA_DIR = os.path.dirname(os.path.abspath(__file__))
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+
+
+def get_db():
+    conn = psycopg2.connect(DATABASE_URL)
+    conn.autocommit = True
+    return conn
+
+
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS store (
+            name TEXT PRIMARY KEY,
+            data JSONB NOT NULL DEFAULT '[]'::jsonb
+        )
+    ''')
+    # Ensure all collections exist
+    for name in ['articles', 'transactions', 'expenses', 'customers', 'catstock']:
+        cur.execute(
+            "INSERT INTO store (name, data) VALUES (%s, '[]'::jsonb) ON CONFLICT (name) DO NOTHING",
+            (name,)
+        )
+    cur.close()
+    conn.close()
 
 
 def load_json(name):
-    path = os.path.join(DATA_DIR, f'{name}.json')
-    if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT data FROM store WHERE name = %s", (name,))
+    row = cur.fetchone()
+    cur.close()
+    conn.close()
+    if row:
+        return row[0] if isinstance(row[0], list) else json.loads(row[0])
     return []
 
 
 def save_json(name, data):
-    path = os.path.join(DATA_DIR, f'{name}.json')
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO store (name, data) VALUES (%s, %s::jsonb) ON CONFLICT (name) DO UPDATE SET data = %s::jsonb",
+        (name, json.dumps(data, ensure_ascii=False), json.dumps(data, ensure_ascii=False))
+    )
+    cur.close()
+    conn.close()
 
 
 def next_id(data):
     return max((e.get('id', 0) for e in data), default=0) + 1
+
+
+# Initialize DB on startup
+if DATABASE_URL:
+    try:
+        init_db()
+    except Exception as e:
+        print(f"DB init error: {e}")
 
 
 @app.route('/')
@@ -293,9 +336,12 @@ def customer_stats(cid):
     def calc_total(tx_list):
         total = 0
         for t in tx_list:
-            art = art_map.get(t.get('articleId'))
-            price = art.get('sellPrice', 0) if art else t.get('price', 0)
-            total += price * t.get('quantity', 0)
+            if t.get('price'):
+                total += t.get('price', 0)
+            else:
+                art = art_map.get(t.get('articleId'))
+                price = art.get('sellPrice', 0) if art else 0
+                total += price * t.get('quantity', 0)
         return total
 
     day_txns = [t for t in customer_txns if t.get('date', '') >= today]
