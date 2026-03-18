@@ -145,6 +145,50 @@
         .rc .rv{font-size:1.5rem;font-weight:800;margin-top:4px}
         .rc.wide{grid-column:1/-1}
 
+        /* === BESTAND PAGE === */
+        .bestand-total{
+            background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(6,182,212,.12));
+            border:1px solid rgba(52,211,153,.2);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px;
+        }
+        .bestand-total .bt-val{font-size:2.2rem;font-weight:900;color:var(--accent)}
+        .bestand-total .bt-lbl{font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
+        .bestand-total .bt-sub{font-size:.78rem;color:var(--text2);margin-top:8px}
+
+        .cat-card{
+            background:var(--card);border-radius:var(--r);margin-bottom:8px;overflow:hidden;
+        }
+        .cat-header{
+            padding:14px 16px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;
+            transition:background .15s;
+        }
+        .cat-header:active{background:var(--card2)}
+        .cat-header .cat-name{font-size:.92rem;font-weight:700}
+        .cat-header .cat-count{font-size:.72rem;color:var(--text2)}
+        .cat-header .cat-right{display:flex;align-items:center;gap:10px}
+        .cat-header .cat-stock{font-size:1.15rem;font-weight:800}
+        .cat-header .cat-stock.ok{color:var(--green)}.cat-header .cat-stock.low{color:var(--orange)}.cat-header .cat-stock.out{color:var(--red)}
+        .cat-chevron{
+            width:18px;height:18px;stroke:var(--text2);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+            transition:transform .2s;
+        }
+        .cat-card.open .cat-chevron{transform:rotate(180deg)}
+
+        .cat-items{max-height:0;overflow:hidden;transition:max-height .3s ease}
+        .cat-card.open .cat-items{max-height:2000px}
+        .cat-item{
+            padding:10px 16px;display:flex;align-items:center;justify-content:space-between;
+            border-top:1px solid var(--border);
+        }
+        .cat-item .ci-name{font-size:.84rem;color:var(--text)}
+        .cat-item .ci-stock{font-size:.95rem;font-weight:700}
+        .cat-item .ci-stock.ok{color:var(--green)}.cat-item .ci-stock.low{color:var(--orange)}.cat-item .ci-stock.out{color:var(--red)}
+        .cat-item .ci-price{font-size:.7rem;color:var(--text2)}
+
+        .bestand-bar{
+            height:6px;border-radius:3px;background:var(--card2);margin:4px 16px 12px;overflow:hidden;
+        }
+        .bestand-bar-fill{height:100%;border-radius:3px;transition:width .4s}
+
         /* === SECTION TITLE === */
         .st{font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:16px 0 8px;padding-left:2px}
 
@@ -272,6 +316,10 @@
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <div class="dl">Belege</div>
         </div>
+        <div class="dash-card c-accent2" onclick="nav('bestand')">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+            <div class="dl">Bestand</div>
+        </div>
         <div class="dash-card c-orange" onclick="nav('rep')">
             <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
             <div class="dl">Berichte</div>
@@ -325,6 +373,16 @@
 <!-- AUSGABEN -->
 <div class="pg" id="pg-exp"><div id="expList"></div></div>
 
+<!-- BESTAND -->
+<div class="pg" id="pg-bestand">
+    <div class="bestand-total" id="bestandTotal"></div>
+    <div class="sbar">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="bestandQ" placeholder="Kategorie oder Artikel suchen..." oninput="renderBestand()">
+    </div>
+    <div id="bestandList"></div>
+</div>
+
 <!-- SCANNER -->
 <div class="pg" id="pg-scan">
     <div class="scan-wrap"><div id="scanner-region"></div></div>
@@ -342,14 +400,14 @@
     <button class="nb" onclick="nav('art')" data-p="art">
         <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>Artikel
     </button>
+    <button class="nb" onclick="nav('bestand')" data-p="bestand">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Bestand
+    </button>
     <button class="nb" onclick="nav('scan')" data-p="scan">
         <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>Scan
     </button>
     <button class="nb" onclick="nav('bel')" data-p="bel">
         <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Belege
-    </button>
-    <button class="nb" onclick="nav('rep')" data-p="rep">
-        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>Mehr
     </button>
 </div>
 
@@ -418,7 +476,7 @@
 let articles=[],transactions=[],expenses=[];
 let currentPage='dash',editId=null,stockType='in',stockQty=1,belFilter='all';
 
-const pNames={dash:'Lager und Inventar',art:'Artikel',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner'};
+const pNames={dash:'Lager und Inventar',art:'Artikel',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand'};
 
 // === API ===
 async function api(u,m='GET',b=null){
@@ -450,7 +508,7 @@ function nav(p){
     const back=document.getElementById('backBtn');
     back.classList.toggle('vis',p!=='dash');
     const fab=document.getElementById('fab');
-    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan');
+    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand');
     renderPage();
 }
 function goBack(){nav('dash')}
@@ -459,6 +517,7 @@ function renderPage(){
     else if(currentPage==='bel')renderBel();
     else if(currentPage==='rep')renderRep();
     else if(currentPage==='exp')renderExp();
+    else if(currentPage==='bestand')renderBestand();
     else if(currentPage==='scan')startScanner();
     else renderDash();
 }
@@ -517,8 +576,8 @@ function renderArt(){
                 <div class="li-right">
                     <div class="li-stock ${cls}">${a.stock}</div>
                     <div class="q-btns">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock(${a.id},'out')">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock(${a.id},'in')">+</button>
+                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock(${a.id},'out').then(()=>renderArt())">−</button>
+                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock(${a.id},'in').then(()=>renderArt())">+</button>
                     </div>
                 </div>
             </div>
@@ -536,7 +595,7 @@ async function quickStock(id,type){
     if(type==='out'&&a.stock<1){toast('Nicht auf Lager');return}
     await api('/api/transactions','POST',{type,articleId:id,quantity:1,note:'Schnellbuchung',articleName:a.name});
     toast(type==='in'?'+1 gebucht':'−1 gebucht');
-    await loadAll();renderArt();
+    await loadAll();
 }
 
 function openArtModal(id){
@@ -673,6 +732,85 @@ async function renderRep(){
         ${r.lowStock.length?`<div class="st">Niedriger Bestand</div>${r.lowStock.map(a=>`<div class="li"><div class="li-top">
             <div><div class="li-name">${esc(a.name)}</div></div><div class="li-stock low">${a.stock}</div></div></div>`).join('')}`:''}`;
 }
+
+// === BESTAND ===
+function renderBestand(){
+    const q=(document.getElementById('bestandQ').value||'').toLowerCase();
+    const totalStock=articles.reduce((s,a)=>s+(a.stock||0),0);
+    const totalArticles=articles.length;
+    const totalEK=articles.reduce((s,a)=>s+(a.stock||0)*(a.price||0),0);
+    const totalVK=articles.reduce((s,a)=>s+(a.stock||0)*(a.sellPrice||0),0);
+
+    document.getElementById('bestandTotal').innerHTML=`
+        <div class="bt-val">${totalStock}</div>
+        <div class="bt-lbl">Gesamtbestand</div>
+        <div class="bt-sub">${totalArticles} Artikel · EK ${money(totalEK)} · VK ${money(totalVK)}</div>`;
+
+    // Group by category
+    const catMap={};
+    articles.forEach(a=>{
+        const cat=a.category||'Sonstige';
+        if(!catMap[cat])catMap[cat]={name:cat,items:[],totalStock:0};
+        catMap[cat].items.push(a);
+        catMap[cat].totalStock+=(a.stock||0);
+    });
+    let cats=Object.values(catMap).sort((a,b)=>b.totalStock-a.totalStock);
+
+    // Filter
+    if(q){
+        cats=cats.map(c=>{
+            const nameMatch=c.name.toLowerCase().includes(q);
+            const filteredItems=c.items.filter(a=>a.name.toLowerCase().includes(q)||(a.barcode||'').includes(q));
+            if(nameMatch)return c;
+            if(filteredItems.length)return{...c,items:filteredItems,totalStock:filteredItems.reduce((s,a)=>s+(a.stock||0),0)};
+            return null;
+        }).filter(Boolean);
+    }
+
+    const list=document.getElementById('bestandList');
+    if(!cats.length){list.innerHTML='<div class="empty">Keine Kategorien gefunden</div>';return}
+
+    const maxCatStock=Math.max(...cats.map(c=>c.totalStock),1);
+
+    list.innerHTML=cats.map((c,ci)=>{
+        const catCls=c.totalStock===0?'out':c.items.some(a=>a.stock<=( a.minStock||5)&&a.stock>0)?'low':'ok';
+        const barColor=catCls==='out'?'var(--red)':catCls==='low'?'var(--orange)':'var(--green)';
+        const barPct=Math.round((c.totalStock/maxCatStock)*100);
+        const sorted=[...c.items].sort((a,b)=>(b.stock||0)-(a.stock||0));
+
+        return`<div class="cat-card" id="cat-${ci}">
+            <div class="cat-header" onclick="toggleCat(${ci})">
+                <div>
+                    <div class="cat-name">${esc(c.name)}</div>
+                    <div class="cat-count">${c.items.length} Artikel</div>
+                </div>
+                <div class="cat-right">
+                    <div class="cat-stock ${catCls}">${c.totalStock}</div>
+                    <svg class="cat-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div class="bestand-bar"><div class="bestand-bar-fill" style="width:${barPct}%;background:${barColor}"></div></div>
+            <div class="cat-items">${sorted.map(a=>{
+                const cls=a.stock===0?'out':a.stock<=(a.minStock||5)?'low':'ok';
+                return`<div class="cat-item">
+                    <div>
+                        <div class="ci-name">${esc(a.name)}</div>
+                        <div class="ci-price">EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div>
+                    </div>
+                    <div style="text-align:right">
+                        <div class="ci-stock ${cls}">${a.stock}</div>
+                        <div class="q-btns" style="margin-top:2px">
+                            <button class="q-btn minus" onclick="event.stopPropagation();quickStock(${a.id},'out').then(()=>renderBestand())">−</button>
+                            <button class="q-btn plus" onclick="event.stopPropagation();quickStock(${a.id},'in').then(()=>renderBestand())">+</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('')}</div>
+        </div>`;
+    }).join('');
+}
+
+function toggleCat(i){document.getElementById('cat-'+i).classList.toggle('open')}
 
 // === SCANNER ===
 let scanner=null,scanRunning=false;
