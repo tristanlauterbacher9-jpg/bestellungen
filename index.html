@@ -145,15 +145,24 @@
         .rc .rv{font-size:1.5rem;font-weight:800;margin-top:4px}
         .rc.wide{grid-column:1/-1}
 
-        /* === BESTAND PAGE === */
-        .bestand-total{
-            background:linear-gradient(135deg,rgba(52,211,153,.12),rgba(6,182,212,.12));
-            border:1px solid rgba(52,211,153,.2);border-radius:var(--r);padding:20px;text-align:center;margin-bottom:16px;
+        /* === BESTAND PAGE (table style like app) === */
+        .bestand-header{
+            display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;
         }
-        .bestand-total .bt-val{font-size:2.2rem;font-weight:900;color:var(--accent)}
-        .bestand-total .bt-lbl{font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;margin-top:4px}
-        .bestand-total .bt-sub{font-size:.78rem;color:var(--text2);margin-top:8px}
+        .bestand-header h2{font-size:1.1rem;font-weight:700}
+        .bestand-header .bh-total{font-size:1.1rem;font-weight:800;color:var(--accent)}
 
+        .bestand-row{
+            background:var(--card);border-radius:var(--r);padding:14px 16px;margin-bottom:6px;
+            display:flex;align-items:center;justify-content:space-between;
+        }
+        .bestand-row .br-name{font-size:.88rem;font-weight:600}
+        .bestand-row .br-stock{
+            background:var(--card2);border-radius:20px;padding:6px 16px;
+            font-size:.88rem;font-weight:700;min-width:50px;text-align:center;
+        }
+
+        /* === CAT CARDS (for Kategorien page) === */
         .cat-card{
             background:var(--card);border-radius:var(--r);margin-bottom:8px;overflow:hidden;
         }
@@ -183,11 +192,6 @@
         .cat-item .ci-stock{font-size:.95rem;font-weight:700}
         .cat-item .ci-stock.ok{color:var(--green)}.cat-item .ci-stock.low{color:var(--orange)}.cat-item .ci-stock.out{color:var(--red)}
         .cat-item .ci-price{font-size:.7rem;color:var(--text2)}
-
-        .bestand-bar{
-            height:6px;border-radius:3px;background:var(--card2);margin:4px 16px 12px;overflow:hidden;
-        }
-        .bestand-bar-fill{height:100%;border-radius:3px;transition:width .4s}
 
         /* === KUNDEN === */
         .cust-avatar{
@@ -405,11 +409,11 @@
 
 <!-- BESTAND -->
 <div class="pg" id="pg-bestand">
-    <div class="bestand-total" id="bestandTotal"></div>
-    <div class="sbar">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="bestandQ" placeholder="Kategorie oder Artikel suchen..." oninput="renderBestand()">
+    <div class="bestand-header">
+        <h2>Lagerbestand</h2>
+        <div class="bh-total" id="bestandTotalVal"></div>
     </div>
+    <div class="tabs" id="bestandTabs"></div>
     <div id="bestandList"></div>
 </div>
 
@@ -472,6 +476,12 @@
     <div class="md">
         <div class="md-h"></div>
         <h2 id="mStockT">Neuer Eingang</h2>
+        <div style="margin-bottom:14px">
+            <button class="btn btn-c" style="display:flex;align-items:center;justify-content:center;gap:8px" onclick="cm(document.getElementById('mStock'));nav('scan')">
+                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+                Barcode scannen
+            </button>
+        </div>
         <div class="fg"><label>Kategorie / Produkt</label><select id="iStockCat" onchange="onStockCatChange()"></select></div>
         <div class="fg" id="fgFlavor" style="display:none"><label>Geschmack</label><select id="iStockFlavor"></select></div>
         <div class="fg"><label>Datum</label><input type="date" id="iStockDate"></div>
@@ -1033,78 +1043,34 @@ async function renderCustDetail(id){
 
 // === BESTAND ===
 function renderBestand(){
-    const q=(document.getElementById('bestandQ').value||'').toLowerCase();
     const totalStock=catstock.reduce((s,c)=>s+(c.stock||0),0);
-    const totalCats=catstock.length;
+    document.getElementById('bestandTotalVal').textContent='Gesamtbestand: '+totalStock;
 
-    document.getElementById('bestandTotal').innerHTML=`
-        <div class="bt-val">${totalStock}</div>
-        <div class="bt-lbl">Gesamtbestand</div>
-        <div class="bt-sub">${totalCats} Kategorien · ${articles.length} Geschmäcker</div>`;
+    // Category tabs
+    const cats=catstock.map(c=>c.category);
+    const bf=window.bestandFilter||'';
+    const tabsEl=document.getElementById('bestandTabs');
+    tabsEl.innerHTML=cats.map(c=>{
+        const active=bf===c||(bf===''&&cats[0]===c);
+        return`<button class="tab ${active?'on':''}" onclick="bestandFilter='${c.replace(/'/g,"\\'")}';renderBestand()">${esc(c)}</button>`;
+    }).join('');
 
-    // Build category list from catstock + articles
-    let catList=catstock.map(cs=>{
-        const items=articles.filter(a=>(a.category||'Sonstige')===cs.category);
-        return{name:cs.category,stock:cs.stock||0,minStock:cs.minStock||10,items};
-    });
+    // Auto-select first tab
+    const activeCat=bf||cats[0]||'';
+    if(!bf&&cats.length)window.bestandFilter=cats[0];
 
-    // Add categories from articles that have no catstock entry yet
-    const catsWithStock=new Set(catstock.map(c=>c.category));
-    const extraCats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(c=>!catsWithStock.has(c)))];
-    extraCats.forEach(cat=>{
-        catList.push({name:cat,stock:0,minStock:10,items:articles.filter(a=>(a.category||'Sonstige')===cat)});
-    });
-
-    catList.sort((a,b)=>b.stock-a.stock);
-
-    // Filter
-    if(q){
-        catList=catList.map(c=>{
-            const nameMatch=c.name.toLowerCase().includes(q);
-            const filteredItems=c.items.filter(a=>a.name.toLowerCase().includes(q)||(a.barcode||'').includes(q));
-            if(nameMatch)return c;
-            if(filteredItems.length)return{...c,items:filteredItems};
-            return null;
-        }).filter(Boolean);
-    }
+    const items=articles.filter(a=>a.category===activeCat);
+    const cs=catstock.find(c=>c.category===activeCat);
+    const catStockVal=cs?cs.stock||0:0;
 
     const list=document.getElementById('bestandList');
-    if(!catList.length){list.innerHTML='<div class="empty">Keine Kategorien gefunden</div>';return}
+    if(!items.length&&!activeCat){list.innerHTML='<div class="empty">Keine Kategorien vorhanden</div>';return}
 
-    const maxCatStock=Math.max(...catList.map(c=>c.stock),1);
-
-    list.innerHTML=catList.map((c,ci)=>{
-        const catCls=c.stock===0?'out':c.stock<=c.minStock?'low':'ok';
-        const barColor=catCls==='out'?'var(--red)':catCls==='low'?'var(--orange)':'var(--green)';
-        const barPct=Math.round((c.stock/maxCatStock)*100);
-
-        return`<div class="cat-card" id="cat-${ci}">
-            <div class="cat-header" onclick="toggleCat(${ci})">
-                <div>
-                    <div class="cat-name">${esc(c.name)}</div>
-                    <div class="cat-count">${c.items.length} Geschmäcker</div>
-                </div>
-                <div class="cat-right">
-                    <div class="cat-stock ${catCls}">${c.stock}</div>
-                    <div class="q-btns" style="margin-left:8px">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','out')">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','in')">+</button>
-                    </div>
-                    <svg class="cat-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
-                </div>
-            </div>
-            <div class="bestand-bar"><div class="bestand-bar-fill" style="width:${barPct}%;background:${barColor}"></div></div>
-            <div class="cat-items">${c.items.map(a=>`<div class="cat-item">
-                    <div>
-                        <div class="ci-name">${esc(a.name)}</div>
-                        <div class="ci-price">EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div>
-                    </div>
-                </div>`).join('')}</div>
-        </div>`;
-    }).join('');
+    list.innerHTML=items.map(a=>`<div class="bestand-row">
+        <div class="br-name">${esc(activeCat)} · ${esc(a.name)}</div>
+        <div class="br-stock">${catStockVal}</div>
+    </div>`).join('')||'<div class="empty">Keine Geschmäcker in dieser Kategorie</div>';
 }
-
-function toggleCat(i){document.getElementById('cat-'+i).classList.toggle('open')}
 
 // === SCANNER ===
 let scanner=null,scanRunning=false;
@@ -1128,34 +1094,107 @@ function onScan(code){
     const res=document.getElementById('scanRes');
 
     if(a){
+        // Bekannter Barcode — direkt zugeordnet
         const cat=a.category||'Sonstige';
         const st=getCatStock(cat);
         const cls=st===0?'out':st<=getCatMinStock(cat)?'low':'ok';
         res.innerHTML=`<div class="scan-res">
-            <div style="font-size:.75rem;color:var(--text2)">Artikel gefunden</div>
+            <div style="font-size:.75rem;color:var(--accent)">Erkannt</div>
             <div class="scan-code">${esc(code)}</div>
             <div class="scan-det">
-                <div class="li-name">${esc(cat)}</div>
-                <div class="li-sub" style="margin-top:4px">${esc(a.name)} · VK ${money(a.sellPrice||0)}</div>
-                <div style="margin-top:8px;font-weight:700">Kategorie-Bestand: <span class="li-stock ${cls}">${st}</span></div>
+                <div class="li-name">${esc(cat)} · ${esc(a.name)}</div>
+                <div style="margin-top:8px;font-weight:700">Bestand: <span class="li-stock ${cls}">${st}</span></div>
             </div>
             <div class="scan-acts">
                 <button class="btn btn-p" onclick="scanBook('${cat.replace(/'/g,"\\'")}','in')">+ Eingang</button>
-                <button class="btn btn-c" onclick="scanSell(${a.id})">Verkauf buchen</button>
+                <button class="btn btn-c" onclick="scanSell(${a.id})">Verkauf</button>
             </div>
             <button class="btn btn-c" onclick="resumeScan()">Weiter scannen</button>
         </div>`;
     }else{
-        res.innerHTML=`<div class="scan-res">
-            <div style="font-size:.75rem;color:var(--orange)">Unbekannter Barcode</div>
-            <div class="scan-code">${esc(code)}</div>
-            <div class="scan-acts">
-                <button class="btn btn-p" onclick="newFromScan('${code.replace(/'/g,"\\'")}')">Artikel anlegen</button>
-                <button class="btn btn-c" onclick="resumeScan()">Weiter scannen</button>
-            </div>
-        </div>`;
+        // Unbekannt — versuche automatische Zuordnung per Barcode-Prefix
+        const match=findBarcodeMatch(code);
+        if(match){
+            // Gleicher Barcode-Prefix wie ein bekanntes Produkt → gleiche Kategorie
+            const cat=match.category;
+            const st=getCatStock(cat);
+            res.innerHTML=`<div class="scan-res">
+                <div style="font-size:.75rem;color:var(--blue)">Kategorie erkannt: ${esc(cat)}</div>
+                <div class="scan-code">${esc(code)}</div>
+                <div class="scan-det">
+                    <div style="font-size:.82rem;color:var(--text2)">Barcode ähnlich wie ${esc(match.name)}</div>
+                    <div style="margin-top:6px;font-weight:700">Bestand: ${st}</div>
+                </div>
+                <div class="st" style="margin:12px 0 8px">Barcode zuweisen an:</div>
+                <div id="scanAssignList">${articles.filter(x=>x.category===cat).map(x=>
+                    `<div class="bestand-row" style="cursor:pointer;margin-bottom:4px" onclick="assignBarcode(${x.id},'${code.replace(/'/g,"\\'")}')">
+                        <div class="br-name">${esc(x.name)}</div>
+                        <div style="font-size:.7rem;color:var(--accent)">Zuweisen</div>
+                    </div>`
+                ).join('')}</div>
+                <button class="btn btn-c" style="margin-top:8px" onclick="resumeScan()">Abbrechen</button>
+            </div>`;
+        }else{
+            // Komplett unbekannt — Kategorie + Geschmack wählen
+            const cats=catstock.map(c=>c.category);
+            res.innerHTML=`<div class="scan-res">
+                <div style="font-size:.75rem;color:var(--orange)">Unbekannter Barcode</div>
+                <div class="scan-code">${esc(code)}</div>
+                <div class="st" style="margin:10px 0 6px">Zuweisen an Kategorie & Geschmack:</div>
+                <div class="fg" style="margin-bottom:8px">
+                    <select id="scanCatSel" onchange="updateScanFlavors()" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem">
+                        ${cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="fg" style="margin-bottom:10px">
+                    <select id="scanFlavorSel" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select>
+                </div>
+                <button class="btn btn-p" onclick="assignBarcodeFromScan('${code.replace(/'/g,"\\'")}')">Barcode zuweisen</button>
+                <button class="btn btn-c" onclick="resumeScan()">Abbrechen</button>
+            </div>`;
+            if(cats.length)updateScanFlavors();
+        }
     }
     if(scanner&&scanRunning)scanner.pause(true);
+}
+
+// Find articles with similar barcode prefix (same product line)
+function findBarcodeMatch(code){
+    if(code.length<6)return null;
+    const prefix=code.substring(0,Math.max(6,Math.floor(code.length*0.6)));
+    for(const a of articles){
+        if(a.barcode&&a.barcode.length>=6&&a.barcode.startsWith(prefix)){
+            return a;
+        }
+    }
+    // Try shorter prefix
+    const shortPrefix=code.substring(0,Math.min(5,code.length));
+    for(const a of articles){
+        if(a.barcode&&a.barcode.startsWith(shortPrefix)){
+            return a;
+        }
+    }
+    return null;
+}
+
+function updateScanFlavors(){
+    const cat=document.getElementById('scanCatSel').value;
+    const sel=document.getElementById('scanFlavorSel');
+    const flavors=articles.filter(a=>a.category===cat);
+    sel.innerHTML=flavors.map(a=>`<option value="${a.id}">${esc(a.name)}</option>`).join('');
+}
+
+async function assignBarcode(artId,code){
+    const a=articles.find(x=>x.id===artId);if(!a)return;
+    await api('/api/articles/'+artId,'PUT',{...a,barcode:code});
+    toast('Barcode zugewiesen: '+a.name);
+    await loadAll();resumeScan();
+}
+
+async function assignBarcodeFromScan(code){
+    const artId=parseInt(document.getElementById('scanFlavorSel').value);
+    if(!artId){toast('Geschmack wählen');return}
+    await assignBarcode(artId,code);
 }
 
 function resumeScan(){document.getElementById('scanRes').innerHTML='';if(scanner&&scanRunning)scanner.resume()}
@@ -1178,6 +1217,9 @@ function newFromScan(code){
     stopScanner();nav('kat');
     setTimeout(()=>{openArtModal();document.getElementById('iBarcode').value=code},300);
 }
+
+// Update Eingang modal to include scan button
+
 
 // === INIT ===
 loadAll();
