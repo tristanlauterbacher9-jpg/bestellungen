@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+bestellbuch_app/
+mobile-bestellbuch/

@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: bestellungen
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn website:app
+    plan: free
+    envVars:
+      - key: PORT
+        value: 10000
