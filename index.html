@@ -1082,43 +1082,60 @@ function renderBestand(){
             <div class="br-stock" style="cursor:pointer">${cs.stock||0}</div>
         </div>`).join('');
     }else{
-        // Single category — show each flavor with the category stock (editable)
+        // Single category — show each flavor with individual stock (editable)
         const items=articles.filter(a=>a.category===bf);
         const cs=catstock.find(c=>c.category===bf);
-        const catStockVal=cs?cs.stock||0:0;
+        const catTotal=items.reduce((s,a)=>s+(a.stock||0),0);
 
         const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 4px">
             <div>
                 <div style="font-weight:700;font-size:.95rem">${esc(bf)}</div>
                 <div style="font-size:.72rem;color:var(--text2)">${items.length} Geschmäcker</div>
             </div>
-            <div style="display:flex;align-items:center;gap:10px">
-                <button class="q-btn minus" onclick="quickStock('${bf.replace(/'/g,"\\'")}','out')" style="width:36px;height:36px;font-size:1.2rem">−</button>
-                <div style="font-size:1.5rem;font-weight:900;min-width:40px;text-align:center;cursor:pointer;color:var(--accent)" onclick="editCatStockPrompt('${bf.replace(/'/g,"\\'")}')">
-                    ${catStockVal}
-                </div>
-                <button class="q-btn plus" onclick="quickStock('${bf.replace(/'/g,"\\'")}','in')" style="width:36px;height:36px;font-size:1.2rem">+</button>
-            </div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--accent)">Gesamt: ${catTotal}</div>
         </div>`;
 
         if(!items.length){list.innerHTML=header+'<div class="empty">Keine Geschmäcker</div>';return}
 
-        list.innerHTML=header+items.map(a=>`<div class="bestand-row">
-            <div class="br-name">${esc(bf)} · ${esc(a.name)}</div>
-            <div class="br-stock">${catStockVal}</div>
-        </div>`).join('');
+        list.innerHTML=header+items.map(a=>{
+            const st=a.stock||0;
+            return`<div class="bestand-row" style="flex-wrap:nowrap">
+                <div class="br-name" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(a.name)}</div>
+                <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+                    <button class="q-btn minus" onclick="adjArtStock(${a.id},-1)" style="width:30px;height:30px">−</button>
+                    <div style="font-size:1rem;font-weight:800;min-width:30px;text-align:center;cursor:pointer" onclick="editArtStockPrompt(${a.id})">${st}</div>
+                    <button class="q-btn plus" onclick="adjArtStock(${a.id},1)" style="width:30px;height:30px">+</button>
+                </div>
+            </div>`;
+        }).join('');
     }
 }
 
-function editCatStockPrompt(catName){
-    const cs=catstock.find(c=>c.category===catName);
-    const current=cs?cs.stock||0:0;
-    const val=prompt('Bestand für '+catName+' setzen:',current);
+async function adjArtStock(id,delta){
+    const a=articles.find(x=>x.id===id);if(!a)return;
+    const newStock=Math.max(0,(a.stock||0)+delta);
+    await api('/api/articles/'+id,'PUT',{...a,stock:newStock});
+    // Also sync catstock total
+    await syncCatStock(a.category);
+    toast(delta>0?'+1':'−1');
+    await loadAll();
+}
+
+function editArtStockPrompt(id){
+    const a=articles.find(x=>x.id===id);if(!a)return;
+    const val=prompt('Bestand für '+a.name+' setzen:',(a.stock||0));
     if(val===null)return;
     const num=parseInt(val);
     if(isNaN(num)||num<0){toast('Ungültige Zahl');return}
-    api('/api/catstock','POST',{category:catName,stock:num,minStock:cs?cs.minStock||10:10,price:cs?cs.price||0:0,sellPrice:cs?cs.sellPrice||0:0})
-        .then(()=>{toast('Bestand gesetzt: '+num);return loadAll()});
+    api('/api/articles/'+id,'PUT',{...a,stock:num})
+        .then(()=>syncCatStock(a.category))
+        .then(()=>{toast('Bestand: '+num);return loadAll()});
+}
+
+async function syncCatStock(catName){
+    const total=articles.filter(a=>a.category===catName).reduce((s,a)=>s+(a.stock||0),0);
+    const cs=catstock.find(c=>c.category===catName);
+    await api('/api/catstock','POST',{category:catName,stock:total,minStock:cs?cs.minStock||10:10,price:cs?cs.price||0:0,sellPrice:cs?cs.sellPrice||0:0});
 }
 
 // === SCANNER ===
