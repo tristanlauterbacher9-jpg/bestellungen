@@ -6,8 +6,12 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#111">
-    <title>Lager und Inventar</title>
+    <meta name="theme-color" content="#111111">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <meta name="apple-mobile-web-app-title" content="GZ.LAGER">
+    <title>GZ.LAGER</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <style>
@@ -320,7 +324,7 @@
     <button class="hdr-btn back-btn" id="backBtn" onclick="goBack()">
         <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
     </button>
-    <h1 id="title">Lager und Inventar</h1>
+    <h1 id="title">GZ.LAGER</h1>
     <button class="hdr-btn" onclick="loadAll().then(()=>{toast('Aktualisiert');if(currentPage!=='dashboard')renderPage()})">
         <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
     </button>
@@ -573,7 +577,7 @@
 let articles=[],transactions=[],expenses=[],customers=[],catstock=[];
 let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
 
-const pNames={dash:'Lager und Inventar',kat:'Kategorien',bel:'Belege',eingang:'Eingang',ausgang:'Ausgang',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
+const pNames={dash:'GZ.LAGER',kat:'Kategorien',bel:'Belege',eingang:'Eingang',ausgang:'Ausgang',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
 // === API ===
 async function api(u,m='GET',b=null){
@@ -1484,6 +1488,11 @@ function newFromScan(code){
 
 // === INIT ===
 loadAll();
+
+// === PWA SERVICE WORKER ===
+if('serviceWorker' in navigator){
+    navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>
