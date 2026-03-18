@@ -1,0 +1,20 @@
+[
+  {
+    "id": 1,
+    "category": "Uzy Crystal King 50K",
+    "stock": 0,
+    "minStock": 10
+  },
+  {
+    "id": 2,
+    "category": "Bangking 30000",
+    "stock": 0,
+    "minStock": 10
+  },
+  {
+    "id": 3,
+    "category": "Fumot 15k",
+    "stock": 0,
+    "minStock": 10
+  }
+]
