@@ -2,9 +2,12 @@ services:
   - type: web
     name: bestellungen
     runtime: python
+    branch: master
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn website:app
+    startCommand: gunicorn website:app --bind 0.0.0.0:$PORT
     plan: free
     envVars:
       - key: PORT
-        value: 10000
+        value: "10000"
+      - key: PYTHON_VERSION
+        value: "3.12.0"
