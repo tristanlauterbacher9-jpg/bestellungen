@@ -345,13 +345,9 @@
             <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
             <div class="dl">Kategorien</div>
         </div>
-        <div class="dash-card c-green" onclick="nav('eingang')">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <div class="dl">Eingang</div>
-        </div>
-        <div class="dash-card c-red" onclick="nav('ausgang')">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <div class="dl">Ausgang</div>
+        <div class="dash-card c-blue" onclick="nav('bel')">
+            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <div class="dl">Belege</div>
         </div>
         <div class="dash-card c-accent" onclick="nav('kunden')" style="color:var(--blue)">
             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
@@ -368,6 +364,14 @@
         <div class="dash-card c-red" onclick="nav('exp')">
             <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             <div class="dl">Ausgaben</div>
+        </div>
+        <div class="dash-card c-green" onclick="openStockModal('in')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <div class="dl">Eingang</div>
+        </div>
+        <div class="dash-card c-red" onclick="openStockModal('out')">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <div class="dl">Ausgang</div>
         </div>
         <div class="dash-card c-accent2 wide" onclick="nav('scan')">
             <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
@@ -395,31 +399,6 @@
     <div id="belList"></div>
 </div>
 
-<!-- EINGANG -->
-<div class="pg" id="pg-eingang">
-    <button class="btn btn-p" style="width:100%;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openStockModal('in')">
-        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Neuer Eingang
-    </button>
-    <div class="sbar">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="eingangQ" placeholder="Eingänge suchen..." oninput="renderEingang()">
-    </div>
-    <div id="eingangList"></div>
-</div>
-
-<!-- AUSGANG -->
-<div class="pg" id="pg-ausgang">
-    <button class="btn btn-p" style="width:100%;margin-bottom:14px;background:var(--red);display:flex;align-items:center;justify-content:center;gap:8px" onclick="openStockModal('out')">
-        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Neuer Ausgang
-    </button>
-    <div class="sbar">
-        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="ausgangQ" placeholder="Ausgänge suchen..." oninput="renderAusgang()">
-    </div>
-    <div id="ausgangList"></div>
-</div>
 
 <!-- BERICHTE -->
 <div class="pg" id="pg-rep">
@@ -579,7 +558,7 @@
 let articles=[],transactions=[],expenses=[],customers=[],catstock=[];
 let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
 
-const pNames={dash:'GZ.LAGER',kat:'Kategorien',bel:'Belege',eingang:'Eingang',ausgang:'Ausgang',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
+const pNames={dash:'GZ.LAGER',kat:'Kategorien',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
 // === API ===
 async function api(u,m='GET',b=null){
@@ -613,15 +592,13 @@ function nav(p){
     const back=document.getElementById('backBtn');
     back.classList.toggle('vis',p!=='dash');
     const fab=document.getElementById('fab');
-    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail'||p==='bel'||p==='eingang'||p==='ausgang');
+    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail'||p==='bel');
     renderPage();
 }
 function goBack(){if(currentPage==='custdetail')nav('kunden');else nav('dash')}
 function renderPage(){
     if(currentPage==='kat')renderKat();
     else if(currentPage==='bel')renderBel();
-    else if(currentPage==='eingang')renderEingang();
-    else if(currentPage==='ausgang')renderAusgang();
     else if(currentPage==='rep')renderRep();
     else if(currentPage==='exp')renderExp();
     else if(currentPage==='bestand')renderBestand();
@@ -642,12 +619,10 @@ function renderDash(){
     const lowCount=catstock.filter(c=>c.stock>0&&c.stock<=(c.minStock||10)).length;
     const outCount=catstock.filter(c=>(c.stock||0)===0).length;
 
-    const totalIn=transactions.filter(t=>t.type==='in').reduce((s,t)=>s+(t.quantity||0),0);
-    const totalOut=transactions.filter(t=>t.type==='out').reduce((s,t)=>s+(t.quantity||0),0);
     document.getElementById('dashStats').innerHTML=`
+        <div class="dash-stat"><div class="sv">${catstock.length}</div><div class="sl">Kategorien</div></div>
         <div class="dash-stat"><div class="sv" style="color:var(--accent)">${totalStock}</div><div class="sl">Bestand</div></div>
-        <div class="dash-stat"><div class="sv" style="color:var(--green)">${totalIn}</div><div class="sl">Eingänge</div></div>
-        <div class="dash-stat"><div class="sv" style="color:var(--red)">${totalOut}</div><div class="sl">Ausgänge</div></div>`;
+        <div class="dash-stat"><div class="sv" style="color:var(--blue)">${transactions.length}</div><div class="sl">Belege</div></div>`;
 
     const warn=document.getElementById('warnBanner');
     if(lowCount+outCount>0){
@@ -940,33 +915,6 @@ function renderBel(){
 
 async function delTx(id){if(!confirm('Beleg löschen? Bestand wird zurückgerechnet.'))return;await api('/api/transactions/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
-function renderTxList(type,containerId,searchId){
-    const q=(document.getElementById(searchId).value||'').toLowerCase();
-    let f=transactions.filter(t=>t.type===type);
-    f=f.filter(t=>(t.articleName||'').toLowerCase().includes(q)||(t.note||'').toLowerCase().includes(q)||(t.customerName||'').toLowerCase().includes(q));
-    const list=document.getElementById(containerId);
-    const isIn=type==='in';
-    const totalQty=f.reduce((s,t)=>s+(t.quantity||0),0);
-
-    if(!f.length){list.innerHTML='<div class="empty">Keine '+(isIn?'Eingänge':'Ausgänge')+'</div>';return}
-
-    list.innerHTML=`<div class="rc" style="margin-bottom:14px"><div class="rl">Gesamt</div><div class="rv" style="color:${isIn?'var(--green)':'var(--red)'}">${totalQty} Stück</div></div>`+
-        f.map(t=>`<div class="li">
-            <div class="li-top">
-                <div><div class="li-name">${esc(t.articleName||'?')}</div>
-                <div class="li-sub">${fmtDate(t.date)} ${t.time||''}${t.customerName?' · '+esc(t.customerName):''}${t.note?' · '+esc(t.note):''}</div></div>
-                <div class="li-right">
-                    <div style="font-weight:800;font-size:1.05rem;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
-                </div>
-            </div>
-            <div class="li-actions">
-                <button class="li-btn del" onclick="delTx(${t.id})">Löschen</button>
-            </div>
-        </div>`).join('');
-}
-
-function renderEingang(){renderTxList('in','eingangList','eingangQ')}
-function renderAusgang(){renderTxList('out','ausgangList','ausgangQ')}
 
 // === AUSGABEN ===
 function openExpModal(){
