@@ -483,32 +483,75 @@
     </div>
 </div>
 
-<!-- MODAL: Eingang/Ausgang -->
-<div class="mo" id="mStock" onclick="if(event.target===this)cm(this)">
+<!-- MODAL: Eingang (single item) -->
+<div class="mo" id="mStockIn" onclick="if(event.target===this)cm(this)">
     <div class="md">
         <div class="md-h"></div>
-        <h2 id="mStockT">Neuer Eingang</h2>
+        <h2>Neuer Eingang</h2>
         <div style="margin-bottom:14px">
-            <button class="btn btn-c" style="display:flex;align-items:center;justify-content:center;gap:8px" onclick="cm(document.getElementById('mStock'));nav('scan')">
+            <button class="btn btn-c" style="display:flex;align-items:center;justify-content:center;gap:8px" onclick="cm(document.getElementById('mStockIn'));nav('scan')">
                 <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
                 Barcode scannen
             </button>
         </div>
-        <div class="fg"><label>Kategorie / Produkt</label><select id="iStockCat" onchange="onStockCatChange()"></select></div>
-        <div class="fg" id="fgFlavor" style="display:none"><label>Geschmack</label><select id="iStockFlavor"></select></div>
-        <div class="fg"><label>Datum</label><input type="date" id="iStockDate"></div>
+        <div class="fg"><label>Kategorie</label><select id="iInCat" onchange="onInCatChange()"></select></div>
+        <div class="fg"><label>Geschmack</label><select id="iInFlavor"></select></div>
+        <div class="fg"><label>Datum</label><input type="date" id="iInDate"></div>
         <div class="fg">
             <label>Menge</label>
             <div class="qty-pick">
-                <button type="button" onclick="adjQty(-1)">−</button>
-                <div class="qty-val" id="qtyVal">1</div>
-                <button type="button" onclick="adjQty(1)">+</button>
+                <button type="button" onclick="inQty=Math.max(1,inQty-1);document.getElementById('inQtyVal').textContent=inQty">−</button>
+                <div class="qty-val" id="inQtyVal">1</div>
+                <button type="button" onclick="inQty++;document.getElementById('inQtyVal').textContent=inQty">+</button>
             </div>
         </div>
-        <div class="fg" id="fgCust" style="display:none"><label>Kunde (optional)</label><select id="iStockCust"></select></div>
-        <div class="fg"><label>Notiz (optional)</label><input type="text" id="iStockNote" placeholder="z.B. Lieferung"></div>
-        <button class="btn btn-p" onclick="saveStock()">Buchen</button>
-        <button class="btn btn-c" onclick="cm(document.getElementById('mStock'))">Abbrechen</button>
+        <div class="fg"><label>Notiz (optional)</label><input type="text" id="iInNote" placeholder="z.B. Lieferung"></div>
+        <button class="btn btn-p" onclick="saveIn()">Buchen</button>
+        <button class="btn btn-c" onclick="cm(document.getElementById('mStockIn'))">Abbrechen</button>
+    </div>
+</div>
+
+<!-- MODAL: Ausgang (multi item) -->
+<div class="mo" id="mStockOut" onclick="if(event.target===this)cm(this)">
+    <div class="md">
+        <div class="md-h"></div>
+        <h2>Neuer Ausgang</h2>
+        <div style="margin-bottom:14px">
+            <button class="btn btn-c" style="display:flex;align-items:center;justify-content:center;gap:8px" onclick="cm(document.getElementById('mStockOut'));nav('scan')">
+                <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
+                Barcode scannen
+            </button>
+        </div>
+
+        <!-- Positionen -->
+        <div class="st" style="margin-bottom:8px">Positionen</div>
+        <div id="outItems"></div>
+
+        <div style="background:var(--card2);border-radius:var(--r);padding:12px;margin-bottom:14px">
+            <div class="fg" style="margin-bottom:8px"><label>Kategorie</label><select id="iOutCat" onchange="onOutCatChange()" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select></div>
+            <div class="fg" style="margin-bottom:8px"><label>Geschmack</label><select id="iOutFlavor" style="width:100%;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select></div>
+            <div class="fg" style="margin-bottom:8px">
+                <label>Menge</label>
+                <div class="qty-pick">
+                    <button type="button" onclick="outItemQty=Math.max(1,outItemQty-1);document.getElementById('outItemQtyVal').textContent=outItemQty">−</button>
+                    <div class="qty-val" id="outItemQtyVal">1</div>
+                    <button type="button" onclick="outItemQty++;document.getElementById('outItemQtyVal').textContent=outItemQty">+</button>
+                </div>
+            </div>
+            <button class="btn btn-p" style="width:100%" onclick="addOutItem()">+ Hinzufügen</button>
+        </div>
+
+        <div class="fg"><label>Datum</label><input type="date" id="iOutDate"></div>
+        <div class="fg">
+            <label>Kunde (optional)</label>
+            <div style="display:flex;gap:6px">
+                <select id="iOutCust" style="flex:1;padding:10px;border:1px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:.88rem"></select>
+                <button class="btn btn-c" style="flex:none;padding:10px 14px;white-space:nowrap" onclick="quickNewCust()">+ Neu</button>
+            </div>
+        </div>
+        <div class="fg"><label>Notiz (optional)</label><input type="text" id="iOutNote" placeholder="z.B. Abholung"></div>
+        <button class="btn btn-p" onclick="saveOut()">Alles buchen</button>
+        <button class="btn btn-c" onclick="cm(document.getElementById('mStockOut'))">Abbrechen</button>
     </div>
 </div>
 
@@ -556,7 +599,7 @@
 
 <script>
 let articles=[],transactions=[],expenses=[],customers=[],catstock=[];
-let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
+let currentPage='dash',editId=null,editCustId=null,belFilter='all';
 
 const pNames={dash:'GZ.LAGER',kat:'Kategorien',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
@@ -796,84 +839,131 @@ async function saveArt(){
 async function delArt(id){if(!confirm('Artikel löschen?'))return;await api('/api/articles/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
 // === EINGANG/AUSGANG ===
+let inQty=1,outItemQty=1,outItemsList=[];
+
 function openStockModal(type,preselect,preselectCust){
-    stockType=type;stockQty=1;
-    document.getElementById('mStockT').textContent=type==='in'?'Neuer Eingang':'Neuer Ausgang';
-    document.getElementById('qtyVal').textContent='1';
-    document.getElementById('iStockNote').value='';
-    document.getElementById('iStockDate').value=new Date().toISOString().slice(0,10);
-
     const cats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(Boolean))];
-    const catSel=document.getElementById('iStockCat');
-
-    // If preselect is an article id, find its category
-    let preselectCat='';
-    if(preselect){const pa=articles.find(x=>x.id===preselect);if(pa)preselectCat=pa.category||'Sonstige'}
-
-    catSel.innerHTML=cats.map(c=>{
-        const st=getCatStock(c);
-        return`<option value="${esc(c)}"${c===preselectCat?' selected':''}>${esc(c)} (${st})</option>`;
-    }).join('');
-
-    // Show flavor picker for both Eingang and Ausgang
-    const fgFlavor=document.getElementById('fgFlavor');
-    fgFlavor.style.display='';
-    onStockCatChange(preselect);
-
-    // Customer select for Ausgang
-    const fgC=document.getElementById('fgCust');
-    const custSel=document.getElementById('iStockCust');
-    if(type==='out'){
-        fgC.style.display='';
-        custSel.innerHTML='<option value="">-- Kein Kunde --</option>'+customers.map(c=>`<option value="${c.id}"${c.id===preselectCust?' selected':''}>${esc(c.name)}</option>`).join('');
-    }else{fgC.style.display='none'}
-
     if(!cats.length){toast('Erst Kategorie mit Artikeln anlegen');return}
-    document.getElementById('mStock').classList.add('on');
+
+    if(type==='in'){
+        inQty=1;
+        document.getElementById('inQtyVal').textContent='1';
+        document.getElementById('iInNote').value='';
+        document.getElementById('iInDate').value=new Date().toISOString().slice(0,10);
+        const catSel=document.getElementById('iInCat');
+        let preselectCat='';
+        if(preselect){const pa=articles.find(x=>x.id===preselect);if(pa)preselectCat=pa.category||'Sonstige'}
+        catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}"${c===preselectCat?' selected':''}>${esc(c)}</option>`).join('');
+        onInCatChange(preselect);
+        document.getElementById('mStockIn').classList.add('on');
+    }else{
+        outItemQty=1;outItemsList=[];
+        document.getElementById('outItemQtyVal').textContent='1';
+        document.getElementById('iOutNote').value='';
+        document.getElementById('iOutDate').value=new Date().toISOString().slice(0,10);
+        const catSel=document.getElementById('iOutCat');
+        catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+        onOutCatChange();
+        renderOutItems();
+        // Customer select
+        const custSel=document.getElementById('iOutCust');
+        custSel.innerHTML='<option value="">-- Kein Kunde --</option>'+customers.map(c=>`<option value="${c.id}"${c.id===preselectCust?' selected':''}>${esc(c.name)}</option>`).join('');
+        // If preselect flavor, add it
+        if(preselect){
+            const pa=articles.find(x=>x.id===preselect);
+            if(pa){
+                catSel.value=pa.category||'Sonstige';
+                onOutCatChange();
+                document.getElementById('iOutFlavor').value=pa.id;
+            }
+        }
+        document.getElementById('mStockOut').classList.add('on');
+    }
 }
 
-function onStockCatChange(preselectId){
-    const cat=document.getElementById('iStockCat').value;
+function onInCatChange(preselectId){
+    const cat=document.getElementById('iInCat').value;
     const flavors=articles.filter(a=>(a.category||'Sonstige')===cat);
-    const sel=document.getElementById('iStockFlavor');
-    sel.innerHTML=flavors.map(a=>`<option value="${a.id}"${a.id===preselectId?' selected':''}>${esc(a.name)}</option>`).join('');
+    document.getElementById('iInFlavor').innerHTML=flavors.map(a=>`<option value="${a.id}"${a.id===preselectId?' selected':''}>${esc(a.name)}</option>`).join('');
 }
 
-function adjQty(d){stockQty=Math.max(1,stockQty+d);document.getElementById('qtyVal').textContent=stockQty}
+function onOutCatChange(){
+    const cat=document.getElementById('iOutCat').value;
+    const flavors=articles.filter(a=>(a.category||'Sonstige')===cat);
+    document.getElementById('iOutFlavor').innerHTML=flavors.map(a=>`<option value="${a.id}">${esc(a.name)} (${a.stock||0})</option>`).join('');
+}
 
-async function saveStock(){
-    const catName=document.getElementById('iStockCat').value;
-    const note=document.getElementById('iStockNote').value.trim();
-    const date=document.getElementById('iStockDate').value;
-    const catStockVal=getCatStock(catName);
+function addOutItem(){
+    const aid=parseInt(document.getElementById('iOutFlavor').value);
+    const a=articles.find(x=>x.id===aid);
+    if(!a){toast('Geschmack wählen');return}
+    const artStock=a.stock||0;
+    // Check already added qty for this article
+    const alreadyAdded=outItemsList.filter(x=>x.aid===aid).reduce((s,x)=>s+x.qty,0);
+    if(alreadyAdded+outItemQty>artStock){toast('Nicht genug auf Lager ('+artStock+', bereits '+alreadyAdded+' hinzugefügt)');return}
+    outItemsList.push({aid,cat:a.category,name:a.name,qty:outItemQty});
+    outItemQty=1;document.getElementById('outItemQtyVal').textContent='1';
+    renderOutItems();
+}
 
-    // Get selected flavor
-    const aid=parseInt(document.getElementById('iStockFlavor').value);
+function removeOutItem(idx){outItemsList.splice(idx,1);renderOutItems()}
+
+function renderOutItems(){
+    const el=document.getElementById('outItems');
+    if(!outItemsList.length){el.innerHTML='<div style="color:var(--text2);font-size:.82rem;margin-bottom:10px;text-align:center">Noch keine Positionen</div>';return}
+    el.innerHTML=outItemsList.map((item,i)=>
+        `<div style="display:flex;align-items:center;justify-content:space-between;background:var(--card);border-radius:10px;padding:10px 12px;margin-bottom:6px">
+            <div>
+                <div style="font-size:.85rem;font-weight:600">${esc(item.cat)} — ${esc(item.name)}</div>
+                <div style="font-size:.72rem;color:var(--text2)">Menge: ${item.qty}</div>
+            </div>
+            <button style="background:none;border:none;color:var(--red);font-size:1.2rem;cursor:pointer;padding:4px 8px" onclick="removeOutItem(${i})">✕</button>
+        </div>`
+    ).join('');
+}
+
+async function quickNewCust(){
+    const name=prompt('Kundenname:');
+    if(!name||!name.trim())return;
+    const res=await api('/api/customers','POST',{name:name.trim(),note:''});
+    customers.unshift(res);
+    const custSel=document.getElementById('iOutCust');
+    custSel.innerHTML='<option value="">-- Kein Kunde --</option>'+customers.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('');
+    custSel.value=res.id;
+    toast('Kunde erstellt: '+name.trim());
+}
+
+async function saveIn(){
+    const catName=document.getElementById('iInCat').value;
+    const aid=parseInt(document.getElementById('iInFlavor').value);
     const a=articles.find(x=>x.id===aid);
     const flavorName=a?a.name:'';
+    const note=document.getElementById('iInNote').value.trim();
+    const date=document.getElementById('iInDate').value;
 
-    if(stockType==='out'){
-        // Check article-level stock for Ausgang
-        const artStock=a?(a.stock||0):catStockVal;
-        if(artStock<stockQty){toast('Nicht genug auf Lager ('+artStock+')');return}
-    }
-
-    const body={type:stockType,quantity:stockQty,note,date,categoryName:catName,
-        articleName:catName+' — '+flavorName,
-        articleId:aid||null};
-
-    if(stockType==='out'){
-        const custId=parseInt(document.getElementById('iStockCust').value);
-        if(custId){
-            const c=customers.find(x=>x.id===custId);
-            body.customerId=custId;
-            body.customerName=c?c.name:'';
-        }
-    }
-
+    const body={type:'in',quantity:inQty,note,date,categoryName:catName,
+        articleName:catName+' — '+flavorName,articleId:aid||null};
     await api('/api/transactions','POST',body);
-    toast(stockType==='in'?`+${stockQty} gebucht`:`−${stockQty} gebucht`);
-    cm(document.getElementById('mStock'));await loadAll();
+    toast(`+${inQty} gebucht`);
+    cm(document.getElementById('mStockIn'));await loadAll();
+}
+
+async function saveOut(){
+    if(!outItemsList.length){toast('Mindestens eine Position hinzufügen');return}
+    const note=document.getElementById('iOutNote').value.trim();
+    const date=document.getElementById('iOutDate').value;
+    const custId=parseInt(document.getElementById('iOutCust').value);
+    let custName='';
+    if(custId){const c=customers.find(x=>x.id===custId);custName=c?c.name:''}
+
+    for(const item of outItemsList){
+        const body={type:'out',quantity:item.qty,note,date,categoryName:item.cat,
+            articleName:item.cat+' — '+item.name,articleId:item.aid};
+        if(custId){body.customerId=custId;body.customerName=custName}
+        await api('/api/transactions','POST',body);
+    }
+    toast(`${outItemsList.length} Position(en) gebucht`);
+    cm(document.getElementById('mStockOut'));await loadAll();
 }
 
 // === BELEGE ===
