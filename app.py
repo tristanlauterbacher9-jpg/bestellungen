@@ -109,6 +109,12 @@ def create_transaction():
     body['id'] = next_id(txns)
     body['date'] = body.get('date', datetime.now().strftime('%Y-%m-%d'))
     body['time'] = datetime.now().strftime('%H:%M')
+
+    # Generate unique receipt number for outgoing transactions
+    if body.get('type') == 'out':
+        now = datetime.now()
+        out_count = sum(1 for t in txns if t.get('type') == 'out') + 1
+        body['belegNr'] = f"A-{now.strftime('%Y%m%d')}-{out_count:04d}"
     txns.insert(0, body)
     save_json('transactions', txns)
 

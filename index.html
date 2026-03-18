@@ -898,7 +898,7 @@ function renderBel(){
         return`<div class="li">
             <div class="li-top">
                 <div><div class="li-name">${esc(t.articleName||'?')}</div>
-                <div class="li-sub">${fmtDate(t.date)} ${t.time||''}${t.customerName?' · '+esc(t.customerName):''}${t.note?' · '+esc(t.note):''}</div></div>
+                <div class="li-sub">${fmtDate(t.date)} ${t.time||''}${t.belegNr?' · '+esc(t.belegNr):''}${t.customerName?' · '+esc(t.customerName):''}${t.note?' · '+esc(t.note):''}</div></div>
                 <div class="li-right">
                     <span class="badge ${isIn?'badge-in':'badge-out'}">${isIn?'Eingang':'Ausgang'}</span>
                     <div style="margin-top:4px;font-weight:800;font-size:1.05rem;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
