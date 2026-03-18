@@ -288,6 +288,13 @@ def get_catstock():
 def set_catstock():
     body = request.get_json()
     data = load_json('catstock')
+
+    # Delete mode
+    if body.get('_delete'):
+        data = [cs for cs in data if cs.get('category') != body.get('category')]
+        save_json('catstock', data)
+        return jsonify({'ok': True})
+
     found = False
     for entry in data:
         if entry.get('category') == body.get('category'):

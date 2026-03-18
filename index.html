@@ -325,9 +325,9 @@
     <div class="dash-stats" id="dashStats"></div>
     <div class="st">Aktionen</div>
     <div class="dash-grid">
-        <div class="dash-card c-accent" onclick="nav('art')">
-            <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
-            <div class="dl">Artikel</div>
+        <div class="dash-card c-accent" onclick="nav('kat')">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+            <div class="dl">Kategorien</div>
         </div>
         <div class="dash-card c-blue" onclick="nav('bel')">
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -364,14 +364,13 @@
     </div>
 </div>
 
-<!-- ARTIKEL -->
-<div class="pg" id="pg-art">
+<!-- KATEGORIEN -->
+<div class="pg" id="pg-kat">
     <div class="sbar">
         <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="artQ" placeholder="Artikel, Kategorie oder Barcode..." oninput="renderArt()">
+        <input type="text" id="katQ" placeholder="Kategorie oder Geschmack suchen..." oninput="renderKat()">
     </div>
-    <div class="tabs" id="artTabs"></div>
-    <div id="artList"></div>
+    <div id="katList"></div>
 </div>
 
 <!-- BELEGE -->
@@ -428,8 +427,8 @@
     <button class="nb on" onclick="nav('dash')" data-p="dash">
         <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Home
     </button>
-    <button class="nb" onclick="nav('art')" data-p="art">
-        <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/></svg>Artikel
+    <button class="nb" onclick="nav('kat')" data-p="kat">
+        <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>Kategorien
     </button>
     <button class="nb" onclick="nav('bestand')" data-p="bestand">
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>Bestand
@@ -446,7 +445,7 @@
 <div class="mo" id="mArt" onclick="if(event.target===this)cm(this)">
     <div class="md">
         <div class="md-h"></div>
-        <h2 id="mArtT">Neuer Artikel</h2>
+        <h2 id="mArtT">Neuer Geschmack</h2>
         <div class="fg">
             <label>Barcode / EAN</label>
             <div style="display:flex;gap:8px">
@@ -457,9 +456,7 @@
         <div class="fg"><label>Geschmack / Name</label><input type="text" id="iName" placeholder="z.B. Triple Berry"></div>
         <div class="fg">
             <label>Kategorie</label>
-            <select id="iCat" onchange="if(this.value==='__new__'){this.style.display='none';document.getElementById('iCatNew').style.display='';document.getElementById('iCatNew').focus()}">
-            </select>
-            <input type="text" id="iCatNew" placeholder="Neue Kategorie eingeben..." style="display:none;margin-top:6px;width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:.95rem;outline:none">
+            <select id="iCat"></select>
         </div>
         <div class="fg-row">
             <div class="fg"><label>Einkaufspreis</label><input type="number" id="iEK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
@@ -517,13 +514,25 @@
     </div>
 </div>
 
+<!-- MODAL: Neue Kategorie -->
+<div class="mo" id="mKat" onclick="if(event.target===this)cm(this)">
+    <div class="md">
+        <div class="md-h"></div>
+        <h2>Neue Kategorie</h2>
+        <div class="fg"><label>Name</label><input type="text" id="iKatName" placeholder="z.B. Fumot 12k"></div>
+        <div class="fg"><label>Mindestbestand</label><input type="number" id="iKatMin" placeholder="10" min="0" inputmode="numeric" value="10"></div>
+        <button class="btn btn-p" onclick="saveKat()">Erstellen</button>
+        <button class="btn btn-c" onclick="cm(document.getElementById('mKat'))">Abbrechen</button>
+    </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 let articles=[],transactions=[],expenses=[],customers=[],catstock=[];
 let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
 
-const pNames={dash:'Lager und Inventar',art:'Artikel',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
+const pNames={dash:'Lager und Inventar',kat:'Kategorien',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
 // === API ===
 async function api(u,m='GET',b=null){
@@ -557,12 +566,12 @@ function nav(p){
     const back=document.getElementById('backBtn');
     back.classList.toggle('vis',p!=='dash');
     const fab=document.getElementById('fab');
-    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail');
+    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail'||p==='bel');
     renderPage();
 }
 function goBack(){if(currentPage==='custdetail')nav('kunden');else nav('dash')}
 function renderPage(){
-    if(currentPage==='art')renderArt();
+    if(currentPage==='kat')renderKat();
     else if(currentPage==='bel')renderBel();
     else if(currentPage==='rep')renderRep();
     else if(currentPage==='exp')renderExp();
@@ -573,8 +582,7 @@ function renderPage(){
     else renderDash();
 }
 function fabAction(){
-    if(currentPage==='art')openArtModal();
-    else if(currentPage==='bel')openStockModal('in');
+    if(currentPage==='kat')openKatModal();
     else if(currentPage==='exp')openExpModal();
     else if(currentPage==='kunden')openCustModal();
 }
@@ -597,62 +605,103 @@ function renderDash(){
     }else warn.classList.remove('vis');
 }
 
-// === ARTIKEL ===
-function renderArt(){
-    const q=(document.getElementById('artQ').value||'').toLowerCase();
-    let filtered=articles.filter(a=>a.name.toLowerCase().includes(q)||(a.category||'').toLowerCase().includes(q)||(a.barcode||'').includes(q));
+// === KATEGORIEN ===
+function renderKat(){
+    const q=(document.getElementById('katQ').value||'').toLowerCase();
 
-    // Category tabs
-    const cats=[...new Set(articles.map(a=>a.category||'Sonstige').filter(Boolean))];
-    const tabsEl=document.getElementById('artTabs');
-    if(cats.length>1){
-        const af=window.artCatFilter||'';
-        tabsEl.innerHTML=`<button class="tab ${af?'':'on'}" onclick="artCatFilter='';renderArt()">Alle (${articles.length})</button>`+
-            cats.map(c=>{
-                const st=getCatStock(c);
-                return`<button class="tab ${af===c?'on':''}" onclick="artCatFilter='${c}';renderArt()">${esc(c)} (${st})</button>`;
-            }).join('');
-    }else tabsEl.innerHTML='';
+    // Build list: all catstock entries + any categories from articles not yet in catstock
+    let catList=catstock.map(cs=>{
+        const items=articles.filter(a=>(a.category||'')=== cs.category);
+        return{name:cs.category,stock:cs.stock||0,minStock:cs.minStock||10,items};
+    });
+    const catsWithStock=new Set(catstock.map(c=>c.category));
+    const extraCats=[...new Set(articles.map(a=>a.category).filter(c=>c&&!catsWithStock.has(c)))];
+    extraCats.forEach(cat=>{
+        catList.push({name:cat,stock:0,minStock:10,items:articles.filter(a=>a.category===cat)});
+    });
 
-    if(window.artCatFilter)filtered=filtered.filter(a=>(a.category||'Sonstige')===window.artCatFilter);
+    // Filter
+    if(q){
+        catList=catList.filter(c=>c.name.toLowerCase().includes(q)||c.items.some(a=>a.name.toLowerCase().includes(q)));
+    }
 
-    const list=document.getElementById('artList');
-    if(!filtered.length){list.innerHTML='<div class="empty">Keine Artikel gefunden</div>';return}
+    const list=document.getElementById('katList');
+    if(!catList.length){list.innerHTML='<div class="empty">Keine Kategorien vorhanden.<br>Tippe + um eine neue anzulegen.</div>';return}
 
-    // Group by category and show category stock
-    const grouped={};
-    filtered.forEach(a=>{const c=a.category||'Sonstige';if(!grouped[c])grouped[c]=[];grouped[c].push(a)});
-
-    list.innerHTML=Object.entries(grouped).map(([cat,items])=>{
-        const st=getCatStock(cat);
-        const min=getCatMinStock(cat);
-        const cls=st===0?'out':st<=min?'low':'ok';
-        return`<div style="margin-bottom:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;padding:0 2px">
+    list.innerHTML=catList.map((c,ci)=>{
+        const cls=c.stock===0?'out':c.stock<=c.minStock?'low':'ok';
+        const filteredItems=q?c.items.filter(a=>a.name.toLowerCase().includes(q)||c.name.toLowerCase().includes(q)):c.items;
+        return`<div class="cat-card" id="kcat-${ci}">
+            <div class="cat-header" onclick="toggleKCat(${ci})">
                 <div>
-                    <span style="font-weight:700;font-size:.88rem">${esc(cat)}</span>
-                    <span style="font-size:.72rem;color:var(--text2);margin-left:6px">${items.length} Geschmäcker</span>
+                    <div class="cat-name">${esc(c.name)}</div>
+                    <div class="cat-count">${c.items.length} Geschmäcker</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px">
-                    <span class="li-stock ${cls}" style="font-size:1.1rem">${st}</span>
-                    <div class="q-btns" style="margin:0">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','out')">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${cat.replace(/'/g,"\\'")}','in')">+</button>
+                <div class="cat-right">
+                    <div class="cat-stock ${cls}">${c.stock}</div>
+                    <div class="q-btns" style="margin-left:6px">
+                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','out')">−</button>
+                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','in')">+</button>
                     </div>
+                    <svg class="cat-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
-            </div>`+
-            items.map(a=>`<div class="li">
-                <div class="li-top">
-                    <div><div class="li-name">${esc(a.name)}</div>
-                    <div class="li-sub">${a.barcode?'<code>'+esc(a.barcode)+'</code> · ':''}EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div></div>
+            </div>
+            <div class="cat-items">
+                ${filteredItems.map(a=>`<div class="cat-item" style="flex-wrap:wrap">
+                    <div style="flex:1">
+                        <div class="ci-name">${esc(a.name)}</div>
+                        <div class="ci-price">${a.barcode?esc(a.barcode)+' · ':''}EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div>
+                    </div>
+                    <div style="display:flex;gap:4px">
+                        <button class="q-btn" onclick="openArtModal(${a.id})" style="border-color:var(--blue);color:var(--blue);width:28px;height:28px;font-size:.7rem">
+                            <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        </button>
+                        <button class="q-btn" onclick="delArt(${a.id})" style="border-color:var(--red);color:var(--red);width:28px;height:28px;font-size:.7rem">
+                            <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                        </button>
+                    </div>
+                </div>`).join('')}
+                <div class="cat-item" style="justify-content:center;cursor:pointer;color:var(--accent);font-weight:600;font-size:.82rem;gap:6px" onclick="openArtModal(null,'${c.name.replace(/'/g,"\\'")}')">
+                    <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Geschmack hinzufügen
                 </div>
-                <div class="li-actions">
-                    <button class="li-btn edit" onclick="openArtModal(${a.id})">Bearbeiten</button>
-                    <button class="li-btn del" onclick="delArt(${a.id})">Löschen</button>
-                </div>
-            </div>`).join('')+
-        `</div>`;
+            </div>
+            <div style="padding:6px 16px 10px;display:flex;justify-content:flex-end">
+                <button style="background:none;border:none;color:var(--red);font-size:.72rem;font-weight:600;cursor:pointer;padding:4px 8px" onclick="delKat('${c.name.replace(/'/g,"\\'")}')">Kategorie löschen</button>
+            </div>
+        </div>`;
     }).join('');
+}
+
+function toggleKCat(i){document.getElementById('kcat-'+i).classList.toggle('open')}
+
+function openKatModal(){
+    document.getElementById('iKatName').value='';
+    document.getElementById('iKatMin').value='10';
+    document.getElementById('mKat').classList.add('on');
+}
+
+async function saveKat(){
+    const name=document.getElementById('iKatName').value.trim();
+    if(!name){toast('Name eingeben');return}
+    const existing=catstock.find(c=>c.category===name);
+    if(existing){toast('Kategorie existiert bereits');return}
+    const minStock=parseInt(document.getElementById('iKatMin').value)||10;
+    await api('/api/catstock','POST',{category:name,stock:0,minStock});
+    toast('Kategorie erstellt');
+    cm(document.getElementById('mKat'));await loadAll();
+}
+
+async function delKat(name){
+    const artCount=articles.filter(a=>a.category===name).length;
+    const msg=artCount?`Kategorie "${name}" mit ${artCount} Geschmäckern löschen?`:`Kategorie "${name}" löschen?`;
+    if(!confirm(msg))return;
+    // Delete all articles in this category
+    const toDelete=articles.filter(a=>a.category===name);
+    for(const a of toDelete){await api('/api/articles/'+a.id,'DELETE')}
+    // Delete catstock
+    await api('/api/catstock','POST',{category:name,stock:0,minStock:0,_delete:true});
+    toast('Gelöscht');await loadAll();
 }
 
 async function quickStock(catName,type){
@@ -667,47 +716,33 @@ function openArtModal(id,preCategory){
     editId=id||null;
     const t=document.getElementById('mArtT');
     const catSel=document.getElementById('iCat');
-    const catNew=document.getElementById('iCatNew');
-    catNew.style.display='none';catNew.value='';
-    catSel.style.display='';
 
-    // Build category dropdown from existing categories
-    const cats=[...new Set(articles.map(a=>a.category).filter(Boolean))];
-
-    if(cats.length===0){
-        // No categories yet — show text input directly
-        catSel.style.display='none';
-        catNew.style.display='';
-        catNew.value='';
-    }else{
-        catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')+
-            '<option value="__new__">+ Neue Kategorie...</option>';
-    }
+    // Build category dropdown from catstock (no "new" option)
+    const cats=catstock.map(c=>c.category);
+    catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
 
     if(id){
         const a=articles.find(x=>x.id===id);if(!a)return;
         document.getElementById('iBarcode').value=a.barcode||'';
         document.getElementById('iName').value=a.name||'';
-        if(cats.includes(a.category)){catSel.value=a.category}
-        else{catNew.value=a.category||'';catNew.style.display='';catSel.style.display='none'}
+        catSel.value=a.category||'';
         document.getElementById('iEK').value=a.price||'';
         document.getElementById('iVK').value=a.sellPrice||'';
-        t.textContent='Artikel bearbeiten';
+        t.textContent='Geschmack bearbeiten';
     }else{
         ['iBarcode','iName','iEK','iVK'].forEach(x=>document.getElementById(x).value='');
-        if(preCategory&&cats.includes(preCategory)){catSel.value=preCategory}
-        else if(cats.length){catSel.value=cats[0]}
-        t.textContent='Neuer Artikel';
+        if(preCategory)catSel.value=preCategory;
+        else if(cats.length)catSel.value=cats[0];
+        t.textContent='Neuer Geschmack';
     }
+    if(!cats.length){toast('Erst eine Kategorie anlegen');return}
     document.getElementById('mArt').classList.add('on');
 }
 
 async function saveArt(){
     const name=document.getElementById('iName').value.trim();
     if(!name){toast('Name eingeben');return}
-    const catSel=document.getElementById('iCat');
-    const catNew=document.getElementById('iCatNew');
-    const category=(catSel.value==='__new__'||catSel.style.display==='none')?catNew.value.trim():catSel.value;
+    const category=document.getElementById('iCat').value;
     if(!category){toast('Kategorie wählen');return}
     const body={name,barcode:document.getElementById('iBarcode').value.trim(),category,
         price:parseFloat(document.getElementById('iEK').value)||0,sellPrice:parseFloat(document.getElementById('iVK').value)||0};
@@ -1140,7 +1175,7 @@ function scanSell(id){
 }
 
 function newFromScan(code){
-    stopScanner();nav('art');
+    stopScanner();nav('kat');
     setTimeout(()=>{openArtModal();document.getElementById('iBarcode').value=code},300);
 }
 
