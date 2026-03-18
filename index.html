@@ -9,6 +9,7 @@
     <meta name="theme-color" content="#111">
     <title>Lager und Inventar</title>
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none}
         :root{
@@ -144,6 +145,11 @@
         .rc .rl{font-size:.68rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px}
         .rc .rv{font-size:1.5rem;font-weight:800;margin-top:4px}
         .rc.wide{grid-column:1/-1}
+        .rc.profit .rv{color:var(--green)}
+        .rc.loss .rv{color:var(--red)}
+        .chart-box{background:var(--card);border-radius:var(--r);padding:16px;margin-bottom:10px}
+        .chart-box h3{font-size:.78rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px;font-weight:600}
+        .chart-box canvas{max-height:220px}
 
         /* === BESTAND PAGE (table style like app) === */
         .bestand-header{
@@ -333,9 +339,13 @@
             <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
             <div class="dl">Kategorien</div>
         </div>
-        <div class="dash-card c-blue" onclick="nav('bel')">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-            <div class="dl">Belege</div>
+        <div class="dash-card c-green" onclick="nav('eingang')">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <div class="dl">Eingang</div>
+        </div>
+        <div class="dash-card c-red" onclick="nav('ausgang')">
+            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <div class="dl">Ausgang</div>
         </div>
         <div class="dash-card c-accent" onclick="nav('kunden')" style="color:var(--blue)">
             <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
@@ -352,14 +362,6 @@
         <div class="dash-card c-red" onclick="nav('exp')">
             <svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
             <div class="dl">Ausgaben</div>
-        </div>
-        <div class="dash-card c-green" onclick="openStockModal('in')">
-            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <div class="dl">Eingang</div>
-        </div>
-        <div class="dash-card c-red" onclick="openStockModal('out')">
-            <svg viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            <div class="dl">Ausgang</div>
         </div>
         <div class="dash-card c-accent2 wide" onclick="nav('scan')">
             <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>
@@ -387,8 +389,37 @@
     <div id="belList"></div>
 </div>
 
+<!-- EINGANG -->
+<div class="pg" id="pg-eingang">
+    <button class="btn btn-p" style="width:100%;margin-bottom:14px;display:flex;align-items:center;justify-content:center;gap:8px" onclick="openStockModal('in')">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neuer Eingang
+    </button>
+    <div class="sbar">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="eingangQ" placeholder="Eingänge suchen..." oninput="renderEingang()">
+    </div>
+    <div id="eingangList"></div>
+</div>
+
+<!-- AUSGANG -->
+<div class="pg" id="pg-ausgang">
+    <button class="btn btn-p" style="width:100%;margin-bottom:14px;background:var(--red);display:flex;align-items:center;justify-content:center;gap:8px" onclick="openStockModal('out')">
+        <svg viewBox="0 0 24 24" style="width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Neuer Ausgang
+    </button>
+    <div class="sbar">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="ausgangQ" placeholder="Ausgänge suchen..." oninput="renderAusgang()">
+    </div>
+    <div id="ausgangList"></div>
+</div>
+
 <!-- BERICHTE -->
-<div class="pg" id="pg-rep"><div id="repContent"></div></div>
+<div class="pg" id="pg-rep">
+    <div class="tabs" id="repTabs"></div>
+    <div id="repContent"></div>
+</div>
 
 <!-- AUSGABEN -->
 <div class="pg" id="pg-exp"><div id="expList"></div></div>
@@ -542,7 +573,7 @@
 let articles=[],transactions=[],expenses=[],customers=[],catstock=[];
 let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
 
-const pNames={dash:'Lager und Inventar',kat:'Kategorien',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
+const pNames={dash:'Lager und Inventar',kat:'Kategorien',bel:'Belege',eingang:'Eingang',ausgang:'Ausgang',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
 // === API ===
 async function api(u,m='GET',b=null){
@@ -576,13 +607,15 @@ function nav(p){
     const back=document.getElementById('backBtn');
     back.classList.toggle('vis',p!=='dash');
     const fab=document.getElementById('fab');
-    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail'||p==='bel');
+    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail'||p==='bel'||p==='eingang'||p==='ausgang');
     renderPage();
 }
 function goBack(){if(currentPage==='custdetail')nav('kunden');else nav('dash')}
 function renderPage(){
     if(currentPage==='kat')renderKat();
     else if(currentPage==='bel')renderBel();
+    else if(currentPage==='eingang')renderEingang();
+    else if(currentPage==='ausgang')renderAusgang();
     else if(currentPage==='rep')renderRep();
     else if(currentPage==='exp')renderExp();
     else if(currentPage==='bestand')renderBestand();
@@ -603,10 +636,12 @@ function renderDash(){
     const lowCount=catstock.filter(c=>c.stock>0&&c.stock<=(c.minStock||10)).length;
     const outCount=catstock.filter(c=>(c.stock||0)===0).length;
 
+    const totalIn=transactions.filter(t=>t.type==='in').reduce((s,t)=>s+(t.quantity||0),0);
+    const totalOut=transactions.filter(t=>t.type==='out').reduce((s,t)=>s+(t.quantity||0),0);
     document.getElementById('dashStats').innerHTML=`
-        <div class="dash-stat"><div class="sv">${catstock.length}</div><div class="sl">Kategorien</div></div>
         <div class="dash-stat"><div class="sv" style="color:var(--accent)">${totalStock}</div><div class="sl">Bestand</div></div>
-        <div class="dash-stat"><div class="sv" style="color:var(--blue)">${transactions.length}</div><div class="sl">Belege</div></div>`;
+        <div class="dash-stat"><div class="sv" style="color:var(--green)">${totalIn}</div><div class="sl">Eingänge</div></div>
+        <div class="dash-stat"><div class="sv" style="color:var(--red)">${totalOut}</div><div class="sl">Ausgänge</div></div>`;
 
     const warn=document.getElementById('warnBanner');
     if(lowCount+outCount>0){
@@ -899,6 +934,34 @@ function renderBel(){
 
 async function delTx(id){if(!confirm('Beleg löschen? Bestand wird zurückgerechnet.'))return;await api('/api/transactions/'+id,'DELETE');toast('Gelöscht');await loadAll()}
 
+function renderTxList(type,containerId,searchId){
+    const q=(document.getElementById(searchId).value||'').toLowerCase();
+    let f=transactions.filter(t=>t.type===type);
+    f=f.filter(t=>(t.articleName||'').toLowerCase().includes(q)||(t.note||'').toLowerCase().includes(q)||(t.customerName||'').toLowerCase().includes(q));
+    const list=document.getElementById(containerId);
+    const isIn=type==='in';
+    const totalQty=f.reduce((s,t)=>s+(t.quantity||0),0);
+
+    if(!f.length){list.innerHTML='<div class="empty">Keine '+(isIn?'Eingänge':'Ausgänge')+'</div>';return}
+
+    list.innerHTML=`<div class="rc" style="margin-bottom:14px"><div class="rl">Gesamt</div><div class="rv" style="color:${isIn?'var(--green)':'var(--red)'}">${totalQty} Stück</div></div>`+
+        f.map(t=>`<div class="li">
+            <div class="li-top">
+                <div><div class="li-name">${esc(t.articleName||'?')}</div>
+                <div class="li-sub">${fmtDate(t.date)} ${t.time||''}${t.customerName?' · '+esc(t.customerName):''}${t.note?' · '+esc(t.note):''}</div></div>
+                <div class="li-right">
+                    <div style="font-weight:800;font-size:1.05rem;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
+                </div>
+            </div>
+            <div class="li-actions">
+                <button class="li-btn del" onclick="delTx(${t.id})">Löschen</button>
+            </div>
+        </div>`).join('');
+}
+
+function renderEingang(){renderTxList('in','eingangList','eingangQ')}
+function renderAusgang(){renderTxList('out','ausgangList','ausgangQ')}
+
 // === AUSGABEN ===
 function openExpModal(){
     document.getElementById('iExpD').value='';document.getElementById('iExpA').value='';
@@ -928,23 +991,155 @@ function renderExp(){
 }
 
 // === BERICHTE ===
-async function renderRep(){
-    const r=await api('/api/reports');
+let repPeriod='month';
+let repCharts={};
+
+function destroyRepCharts(){Object.values(repCharts).forEach(c=>{if(c)c.destroy()});repCharts={}}
+
+function renderRep(){
+    // Period tabs
+    document.getElementById('repTabs').innerHTML=
+        ['week','month','year','all'].map(p=>{
+            const labels={week:'Woche',month:'Monat',year:'Jahr',all:'Gesamt'};
+            return`<button class="tab ${repPeriod===p?'on':''}" onclick="repPeriod='${p}';renderRep()">${labels[p]}</button>`;
+        }).join('');
+
+    const now=new Date();
+    let startDate=null;
+    if(repPeriod==='week'){startDate=new Date(now);startDate.setDate(now.getDate()-now.getDay())}
+    else if(repPeriod==='month'){startDate=new Date(now.getFullYear(),now.getMonth(),1)}
+    else if(repPeriod==='year'){startDate=new Date(now.getFullYear(),0,1)}
+    const startStr=startDate?startDate.toISOString().slice(0,10):'';
+
+    // Filter transactions by period
+    const txPeriod=startStr?transactions.filter(t=>(t.date||'')>=startStr):transactions;
+    const expPeriod=startStr?expenses.filter(e=>(e.date||'')>=startStr):expenses;
+
+    const inTx=txPeriod.filter(t=>t.type==='in');
+    const outTx=txPeriod.filter(t=>t.type==='out');
+
+    // Calculate revenue (Umsatz): outgoing * sellPrice
+    let revenue=0,cost=0;
+    outTx.forEach(t=>{
+        const cat=t.categoryName||'';
+        const cs=catstock.find(c=>c.category===cat);
+        const vk=cs?cs.sellPrice||0:0;
+        revenue+=vk*(t.quantity||0);
+    });
+
+    // Calculate cost (Einkauf): incoming * purchasePrice
+    inTx.forEach(t=>{
+        const cat=t.categoryName||'';
+        const cs=catstock.find(c=>c.category===cat);
+        const ek=cs?cs.price||0:0;
+        cost+=ek*(t.quantity||0);
+    });
+
+    const totalExpenses=expPeriod.reduce((s,e)=>s+(e.amount||0),0);
+    const profit=revenue-cost-totalExpenses;
+    const totalInQty=inTx.reduce((s,t)=>s+(t.quantity||0),0);
+    const totalOutQty=outTx.reduce((s,t)=>s+(t.quantity||0),0);
+    const totalStock=catstock.reduce((s,c)=>s+(c.stock||0),0);
+
+    // Build daily data for line chart (last 7/30/365 days)
+    let days=repPeriod==='week'?7:repPeriod==='month'?30:repPeriod==='year'?12:12;
+    let labels=[],revData=[],expData=[],profitData=[];
+
+    if(repPeriod==='year'||repPeriod==='all'){
+        // Monthly buckets
+        const monthCount=repPeriod==='all'?12:12;
+        for(let i=monthCount-1;i>=0;i--){
+            const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+            const key=d.toISOString().slice(0,7);
+            const mEnd=new Date(d.getFullYear(),d.getMonth()+1,0).toISOString().slice(0,10);
+            const mStart=key+'-01';
+            labels.push(d.toLocaleDateString('de',{month:'short'}));
+            const mOut=transactions.filter(t=>t.type==='out'&&(t.date||'')>=mStart&&(t.date||'')<=mEnd);
+            const mIn=transactions.filter(t=>t.type==='in'&&(t.date||'')>=mStart&&(t.date||'')<=mEnd);
+            const mExp=expenses.filter(e=>(e.date||'')>=mStart&&(e.date||'')<=mEnd);
+            let mRev=0;mOut.forEach(t=>{const cs=catstock.find(c=>c.category===(t.categoryName||''));mRev+=(cs?cs.sellPrice||0:0)*(t.quantity||0)});
+            let mCost=0;mIn.forEach(t=>{const cs=catstock.find(c=>c.category===(t.categoryName||''));mCost+=(cs?cs.price||0:0)*(t.quantity||0)});
+            const mE=mExp.reduce((s,e)=>s+(e.amount||0),0);
+            revData.push(mRev);expData.push(mCost+mE);profitData.push(mRev-mCost-mE);
+        }
+    }else{
+        for(let i=days-1;i>=0;i--){
+            const d=new Date(now);d.setDate(now.getDate()-i);
+            const key=d.toISOString().slice(0,10);
+            labels.push(d.toLocaleDateString('de',{day:'2-digit',month:'2-digit'}));
+            const dOut=transactions.filter(t=>t.type==='out'&&t.date===key);
+            const dIn=transactions.filter(t=>t.type==='in'&&t.date===key);
+            const dExp=expenses.filter(e=>e.date===key);
+            let dRev=0;dOut.forEach(t=>{const cs=catstock.find(c=>c.category===(t.categoryName||''));dRev+=(cs?cs.sellPrice||0:0)*(t.quantity||0)});
+            let dCost=0;dIn.forEach(t=>{const cs=catstock.find(c=>c.category===(t.categoryName||''));dCost+=(cs?cs.price||0:0)*(t.quantity||0)});
+            const dE=dExp.reduce((s,e)=>s+(e.amount||0),0);
+            revData.push(dRev);expData.push(dCost+dE);profitData.push(dRev-dCost-dE);
+        }
+    }
+
+    // Category breakdown for pie chart
+    const catBreakdown={};
+    outTx.forEach(t=>{
+        const cat=t.categoryName||'Sonstige';
+        const cs=catstock.find(c=>c.category===cat);
+        const vk=cs?cs.sellPrice||0:0;
+        catBreakdown[cat]=(catBreakdown[cat]||0)+vk*(t.quantity||0);
+    });
+    const catLabels=Object.keys(catBreakdown);
+    const catValues=Object.values(catBreakdown);
+    const catColors=['#34d399','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#f97316','#14b8a6','#a855f7'];
+
+    destroyRepCharts();
+
     document.getElementById('repContent').innerHTML=`
         <div class="rg">
-            <div class="rc"><div class="rl">Kategorien</div><div class="rv">${(r.catstock||[]).length}</div></div>
-            <div class="rc"><div class="rl">Gesamtbestand</div><div class="rv">${r.totalStock}</div></div>
-            <div class="rc"><div class="rl">Geschmäcker</div><div class="rv">${r.totalArticles}</div></div>
-            <div class="rc"><div class="rl">Ausgaben</div><div class="rv" style="color:var(--red)">${money(r.totalExpenses)}</div></div>
+            <div class="rc ${profit>=0?'profit':'loss'}"><div class="rl">Profit</div><div class="rv">${money(profit)}</div></div>
+            <div class="rc"><div class="rl">Umsatz</div><div class="rv" style="color:var(--green)">${money(revenue)}</div></div>
+            <div class="rc"><div class="rl">Einkauf</div><div class="rv" style="color:var(--orange)">${money(cost)}</div></div>
+            <div class="rc"><div class="rl">Ausgaben</div><div class="rv" style="color:var(--red)">${money(totalExpenses)}</div></div>
         </div>
         <div class="rg">
-            <div class="rc"><div class="rl">Eingänge</div><div class="rv" style="color:var(--green)">+${r.totalIn}</div></div>
-            <div class="rc"><div class="rl">Ausgänge</div><div class="rv" style="color:var(--red)">−${r.totalOut}</div></div>
+            <div class="rc"><div class="rl">Eingänge</div><div class="rv" style="color:var(--green)">+${totalInQty}</div></div>
+            <div class="rc"><div class="rl">Verkäufe</div><div class="rv" style="color:var(--red)">−${totalOutQty}</div></div>
+            <div class="rc"><div class="rl">Bestand</div><div class="rv" style="color:var(--accent)">${totalStock}</div></div>
+            <div class="rc"><div class="rl">Kategorien</div><div class="rv">${catstock.length}</div></div>
         </div>
-        ${r.outOfStock.length?`<div class="st">Ausverkauft</div>${r.outOfStock.map(c=>`<div class="li"><div class="li-top">
-            <div><div class="li-name">${esc(c.category)}</div></div><div class="li-stock out">0</div></div></div>`).join('')}`:''}
-        ${r.lowStock.length?`<div class="st">Niedriger Bestand</div>${r.lowStock.map(c=>`<div class="li"><div class="li-top">
-            <div><div class="li-name">${esc(c.category)}</div></div><div class="li-stock low">${c.stock}</div></div></div>`).join('')}`:''}`;
+        <div class="chart-box"><h3>Umsatz & Kosten</h3><canvas id="chartRevenue"></canvas></div>
+        <div class="chart-box"><h3>Profit</h3><canvas id="chartProfit"></canvas></div>
+        ${catLabels.length?'<div class="chart-box"><h3>Umsatz nach Kategorie</h3><canvas id="chartCat"></canvas></div>':''}
+        ${(function(){
+            const low=catstock.filter(c=>c.stock>0&&c.stock<=(c.minStock||10));
+            const out=catstock.filter(c=>(c.stock||0)===0);
+            let html='';
+            if(out.length)html+='<div class="st">Ausverkauft</div>'+out.map(c=>'<div class="li"><div class="li-top"><div><div class="li-name">'+c.category+'</div></div><div class="li-stock out">0</div></div></div>').join('');
+            if(low.length)html+='<div class="st">Niedriger Bestand</div>'+low.map(c=>'<div class="li"><div class="li-top"><div><div class="li-name">'+c.category+'</div></div><div class="li-stock low">'+c.stock+'</div></div></div>').join('');
+            return html;
+        })()}`;
+
+    // Create charts
+    const chartOpts={responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:'#9ca3af',font:{size:11}}}},scales:{x:{ticks:{color:'#9ca3af',font:{size:10},maxRotation:45},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#9ca3af',font:{size:10}},grid:{color:'rgba(255,255,255,.08)'}}}};
+
+    const ctx1=document.getElementById('chartRevenue');
+    if(ctx1){
+        repCharts.revenue=new Chart(ctx1,{type:'line',data:{labels,datasets:[
+            {label:'Umsatz',data:revData,borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',fill:true,tension:.3,pointRadius:2},
+            {label:'Kosten',data:expData,borderColor:'#ef4444',backgroundColor:'rgba(239,68,68,.1)',fill:true,tension:.3,pointRadius:2}
+        ]},options:chartOpts});
+    }
+
+    const ctx2=document.getElementById('chartProfit');
+    if(ctx2){
+        repCharts.profit=new Chart(ctx2,{type:'bar',data:{labels,datasets:[
+            {label:'Profit',data:profitData,backgroundColor:profitData.map(v=>v>=0?'rgba(52,211,153,.6)':'rgba(239,68,68,.6)'),borderRadius:4}
+        ]},options:{...chartOpts,plugins:{legend:{display:false}}}});
+    }
+
+    const ctx3=document.getElementById('chartCat');
+    if(ctx3&&catLabels.length){
+        repCharts.cat=new Chart(ctx3,{type:'doughnut',data:{labels:catLabels,datasets:[
+            {data:catValues,backgroundColor:catColors.slice(0,catLabels.length),borderWidth:0}
+        ]},options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'bottom',labels:{color:'#9ca3af',font:{size:11},padding:12}}}}});
+    }
 }
 
 // === KUNDEN ===
