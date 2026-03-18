@@ -189,6 +189,23 @@
         }
         .bestand-bar-fill{height:100%;border-radius:3px;transition:width .4s}
 
+        /* === KUNDEN === */
+        .cust-avatar{
+            width:42px;height:42px;border-radius:50%;background:var(--accent);color:#000;
+            display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;flex-shrink:0;
+        }
+        .cust-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+        .cust-stat{background:var(--card);border-radius:var(--r);padding:14px;text-align:center}
+        .cust-stat .csv{font-size:1.3rem;font-weight:800;line-height:1}
+        .cust-stat .csl{font-size:.65rem;color:var(--text2);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+        .cust-stat .csc{font-size:.68rem;color:var(--text2);margin-top:2px}
+        .cust-detail-head{
+            text-align:center;padding:20px 16px;margin-bottom:16px;
+        }
+        .cust-detail-head .cust-avatar{width:64px;height:64px;font-size:1.5rem;margin:0 auto 10px}
+        .cust-detail-head h2{font-size:1.15rem;font-weight:700}
+        .cust-detail-head .cust-phone{font-size:.82rem;color:var(--text2);margin-top:2px}
+
         /* === SECTION TITLE === */
         .st{font-size:.72rem;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600;margin:16px 0 8px;padding-left:2px}
 
@@ -316,6 +333,10 @@
             <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <div class="dl">Belege</div>
         </div>
+        <div class="dash-card c-accent" onclick="nav('kunden')" style="color:var(--blue)">
+            <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>
+            <div class="dl">Kunden</div>
+        </div>
         <div class="dash-card c-accent2" onclick="nav('bestand')">
             <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
             <div class="dl">Bestand</div>
@@ -373,6 +394,20 @@
 <!-- AUSGABEN -->
 <div class="pg" id="pg-exp"><div id="expList"></div></div>
 
+<!-- KUNDEN -->
+<div class="pg" id="pg-kunden">
+    <div class="sbar">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="kundenQ" placeholder="Kunden suchen..." oninput="renderKunden()">
+    </div>
+    <div id="kundenList"></div>
+</div>
+
+<!-- KUNDEN DETAIL -->
+<div class="pg" id="pg-custdetail">
+    <div id="custDetailContent"></div>
+</div>
+
 <!-- BESTAND -->
 <div class="pg" id="pg-bestand">
     <div class="bestand-total" id="bestandTotal"></div>
@@ -406,8 +441,8 @@
     <button class="nb" onclick="nav('scan')" data-p="scan">
         <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/></svg>Scan
     </button>
-    <button class="nb" onclick="nav('bel')" data-p="bel">
-        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Belege
+    <button class="nb" onclick="nav('kunden')" data-p="kunden">
+        <svg viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/></svg>Kunden
     </button>
 </div>
 
@@ -452,6 +487,7 @@
                 <button type="button" onclick="adjQty(1)">+</button>
             </div>
         </div>
+        <div class="fg" id="fgCust" style="display:none"><label>Kunde (optional)</label><select id="iStockCust"></select></div>
         <div class="fg"><label>Notiz (optional)</label><input type="text" id="iStockNote" placeholder="z.B. Lieferung"></div>
         <button class="btn btn-p" onclick="saveStock()">Buchen</button>
         <button class="btn btn-c" onclick="cm(document.getElementById('mStock'))">Abbrechen</button>
@@ -470,13 +506,26 @@
     </div>
 </div>
 
+<!-- MODAL: Kunde -->
+<div class="mo" id="mCust" onclick="if(event.target===this)cm(this)">
+    <div class="md">
+        <div class="md-h"></div>
+        <h2 id="mCustT">Neuer Kunde</h2>
+        <div class="fg"><label>Name</label><input type="text" id="iCustName" placeholder="Kundenname"></div>
+        <div class="fg"><label>Telefon (optional)</label><input type="tel" id="iCustPhone" placeholder="z.B. 0176..." inputmode="tel"></div>
+        <div class="fg"><label>Notiz (optional)</label><input type="text" id="iCustNote" placeholder="z.B. Stammkunde"></div>
+        <button class="btn btn-p" onclick="saveCust()">Speichern</button>
+        <button class="btn btn-c" onclick="cm(document.getElementById('mCust'))">Abbrechen</button>
+    </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
-let articles=[],transactions=[],expenses=[];
-let currentPage='dash',editId=null,stockType='in',stockQty=1,belFilter='all';
+let articles=[],transactions=[],expenses=[],customers=[];
+let currentPage='dash',editId=null,editCustId=null,stockType='in',stockQty=1,belFilter='all';
 
-const pNames={dash:'Lager und Inventar',art:'Artikel',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand'};
+const pNames={dash:'Lager und Inventar',art:'Artikel',bel:'Belege',rep:'Berichte',exp:'Ausgaben',scan:'Scanner',bestand:'Bestand',kunden:'Kunden',custdetail:'Kundenkonto'};
 
 // === API ===
 async function api(u,m='GET',b=null){
@@ -485,7 +534,7 @@ async function api(u,m='GET',b=null){
     return(await fetch(u,o)).json();
 }
 async function loadAll(){
-    [articles,transactions,expenses]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses')]);
+    [articles,transactions,expenses,customers]=await Promise.all([api('/api/articles'),api('/api/transactions'),api('/api/expenses'),api('/api/customers')]);
     if(currentPage==='dash')renderDash();
 }
 
@@ -508,16 +557,18 @@ function nav(p){
     const back=document.getElementById('backBtn');
     back.classList.toggle('vis',p!=='dash');
     const fab=document.getElementById('fab');
-    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand');
+    fab.classList.toggle('hid',p==='dash'||p==='rep'||p==='scan'||p==='bestand'||p==='custdetail');
     renderPage();
 }
-function goBack(){nav('dash')}
+function goBack(){if(currentPage==='custdetail')nav('kunden');else nav('dash')}
 function renderPage(){
     if(currentPage==='art')renderArt();
     else if(currentPage==='bel')renderBel();
     else if(currentPage==='rep')renderRep();
     else if(currentPage==='exp')renderExp();
     else if(currentPage==='bestand')renderBestand();
+    else if(currentPage==='kunden')renderKunden();
+    else if(currentPage==='custdetail')renderCustDetail(window._custDetailId);
     else if(currentPage==='scan')startScanner();
     else renderDash();
 }
@@ -525,6 +576,7 @@ function fabAction(){
     if(currentPage==='art')openArtModal();
     else if(currentPage==='bel')openStockModal('in');
     else if(currentPage==='exp')openExpModal();
+    else if(currentPage==='kunden')openCustModal();
 }
 
 // === DASHBOARD ===
@@ -633,13 +685,20 @@ async function saveArt(){
 async function delArt(id){if(!confirm('Artikel löschen?'))return;await api('/api/articles/'+id,'DELETE');toast('Gelöscht');await loadAll();renderArt()}
 
 // === EINGANG/AUSGANG ===
-function openStockModal(type,preselect){
+function openStockModal(type,preselect,preselectCust){
     stockType=type;stockQty=1;
     document.getElementById('mStockT').textContent=type==='in'?'Neuer Eingang':'Neuer Ausgang';
     const sel=document.getElementById('iStockArt');
     sel.innerHTML=articles.map(a=>`<option value="${a.id}"${a.id===preselect?' selected':''}>${esc(a.name)} (${a.stock})</option>`).join('');
     document.getElementById('qtyVal').textContent='1';
     document.getElementById('iStockNote').value='';
+    // Show customer select for Ausgang
+    const fgC=document.getElementById('fgCust');
+    const custSel=document.getElementById('iStockCust');
+    if(type==='out'){
+        fgC.style.display='';
+        custSel.innerHTML='<option value="">-- Kein Kunde --</option>'+customers.map(c=>`<option value="${c.id}"${c.id===preselectCust?' selected':''}>${esc(c.name)}</option>`).join('');
+    }else{fgC.style.display='none'}
     if(!articles.length){toast('Erst Artikel anlegen');return}
     document.getElementById('mStock').classList.add('on');
 }
@@ -651,7 +710,16 @@ async function saveStock(){
     const note=document.getElementById('iStockNote').value.trim();
     const a=articles.find(x=>x.id===aid);
     if(stockType==='out'&&a&&a.stock<stockQty){toast('Nicht genug auf Lager ('+a.stock+')');return}
-    await api('/api/transactions','POST',{type:stockType,articleId:aid,quantity:stockQty,note,articleName:a?a.name:''});
+    const body={type:stockType,articleId:aid,quantity:stockQty,note,articleName:a?a.name:''};
+    if(stockType==='out'){
+        const custId=parseInt(document.getElementById('iStockCust').value);
+        if(custId){
+            const c=customers.find(x=>x.id===custId);
+            body.customerId=custId;
+            body.customerName=c?c.name:'';
+        }
+    }
+    await api('/api/transactions','POST',body);
     toast(stockType==='in'?`+${stockQty} gebucht`:`−${stockQty} gebucht`);
     cm(document.getElementById('mStock'));await loadAll();
 }
@@ -671,7 +739,7 @@ function renderBel(){
         return`<div class="li">
             <div class="li-top">
                 <div><div class="li-name">${esc(t.articleName||'?')}</div>
-                <div class="li-sub">${fmtDate(t.date)} ${t.time||''}${t.note?' · '+esc(t.note):''}</div></div>
+                <div class="li-sub">${fmtDate(t.date)} ${t.time||''}${t.customerName?' · '+esc(t.customerName):''}${t.note?' · '+esc(t.note):''}</div></div>
                 <div class="li-right">
                     <span class="badge ${isIn?'badge-in':'badge-out'}">${isIn?'Eingang':'Ausgang'}</span>
                     <div style="margin-top:4px;font-weight:800;font-size:1.05rem;color:${isIn?'var(--green)':'var(--red)'}">${isIn?'+':'−'}${t.quantity}</div>
@@ -731,6 +799,118 @@ async function renderRep(){
             <div><div class="li-name">${esc(a.name)}</div></div><div class="li-stock out">0</div></div></div>`).join('')}`:''}
         ${r.lowStock.length?`<div class="st">Niedriger Bestand</div>${r.lowStock.map(a=>`<div class="li"><div class="li-top">
             <div><div class="li-name">${esc(a.name)}</div></div><div class="li-stock low">${a.stock}</div></div></div>`).join('')}`:''}`;
+}
+
+// === KUNDEN ===
+function renderKunden(){
+    const q=(document.getElementById('kundenQ').value||'').toLowerCase();
+    let filtered=customers.filter(c=>c.name.toLowerCase().includes(q)||(c.phone||'').includes(q)||(c.note||'').toLowerCase().includes(q));
+
+    const list=document.getElementById('kundenList');
+    if(!filtered.length){list.innerHTML='<div class="empty">Keine Kunden'+(customers.length?'gefunden':'')+'</div>';return}
+
+    list.innerHTML=filtered.map(c=>{
+        const initials=(c.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+        const txCount=transactions.filter(t=>t.customerId===c.id&&t.type==='out').length;
+        return`<div class="li" onclick="openCustDetail(${c.id})" style="cursor:pointer">
+            <div class="li-top">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <div class="cust-avatar">${esc(initials)}</div>
+                    <div>
+                        <div class="li-name">${esc(c.name)}</div>
+                        <div class="li-sub">${c.phone?esc(c.phone)+' · ':''}${txCount} Käufe${c.note?' · '+esc(c.note):''}</div>
+                    </div>
+                </div>
+                <div class="li-right" style="display:flex;gap:6px">
+                    <button class="li-btn edit" style="flex:none;padding:8px 10px" onclick="event.stopPropagation();openCustModal(${c.id})">
+                        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                    </button>
+                    <button class="li-btn del" style="flex:none;padding:8px 10px" onclick="event.stopPropagation();delCust(${c.id})">
+                        <svg viewBox="0 0 24 24" style="width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function openCustModal(id){
+    editCustId=id||null;
+    const t=document.getElementById('mCustT');
+    if(id){
+        const c=customers.find(x=>x.id===id);if(!c)return;
+        document.getElementById('iCustName').value=c.name||'';
+        document.getElementById('iCustPhone').value=c.phone||'';
+        document.getElementById('iCustNote').value=c.note||'';
+        t.textContent='Kunde bearbeiten';
+    }else{
+        ['iCustName','iCustPhone','iCustNote'].forEach(x=>document.getElementById(x).value='');
+        t.textContent='Neuer Kunde';
+    }
+    document.getElementById('mCust').classList.add('on');
+}
+
+async function saveCust(){
+    const name=document.getElementById('iCustName').value.trim();
+    if(!name){toast('Name eingeben');return}
+    const body={name,phone:document.getElementById('iCustPhone').value.trim(),note:document.getElementById('iCustNote').value.trim()};
+    if(editCustId){await api('/api/customers/'+editCustId,'PUT',body);toast('Gespeichert')}
+    else{await api('/api/customers','POST',body);toast('Kunde erstellt')}
+    cm(document.getElementById('mCust'));await loadAll();renderKunden();
+}
+
+async function delCust(id){if(!confirm('Kunde löschen?'))return;await api('/api/customers/'+id,'DELETE');toast('Gelöscht');await loadAll();renderKunden()}
+
+function openCustDetail(id){
+    window._custDetailId=id;
+    nav('custdetail');
+}
+
+async function renderCustDetail(id){
+    const c=customers.find(x=>x.id===id);
+    if(!c){document.getElementById('custDetailContent').innerHTML='<div class="empty">Kunde nicht gefunden</div>';return}
+    const initials=(c.name||'?').split(' ').map(w=>w[0]).join('').toUpperCase().slice(0,2);
+
+    document.getElementById('custDetailContent').innerHTML='<div class="empty">Lade Daten...</div>';
+    const s=await api('/api/customers/'+id+'/stats');
+
+    document.getElementById('custDetailContent').innerHTML=`
+        <div class="cust-detail-head">
+            <div class="cust-avatar">${esc(initials)}</div>
+            <h2>${esc(c.name)}</h2>
+            ${c.phone?'<div class="cust-phone">'+esc(c.phone)+'</div>':''}
+            ${c.note?'<div class="cust-phone">'+esc(c.note)+'</div>':''}
+        </div>
+        <div class="st">Umsatz</div>
+        <div class="cust-stats">
+            <div class="cust-stat">
+                <div class="csv" style="color:var(--accent)">${money(s.today)}</div>
+                <div class="csl">Heute</div>
+                <div class="csc">${s.todayCount} Käufe</div>
+            </div>
+            <div class="cust-stat">
+                <div class="csv" style="color:var(--blue)">${money(s.week)}</div>
+                <div class="csl">Diese Woche</div>
+                <div class="csc">${s.weekCount} Käufe</div>
+            </div>
+            <div class="cust-stat">
+                <div class="csv" style="color:var(--orange)">${money(s.month)}</div>
+                <div class="csl">Dieser Monat</div>
+                <div class="csc">${s.monthCount} Käufe</div>
+            </div>
+            <div class="cust-stat">
+                <div class="csv" style="color:var(--green)">${money(s.year)}</div>
+                <div class="csl">Dieses Jahr</div>
+                <div class="csc">${s.yearCount} Käufe</div>
+            </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-bottom:16px">
+            <button class="btn btn-p" style="flex:1" onclick="openStockModal('out',null,${c.id})">Neuer Verkauf</button>
+        </div>
+        <div class="st">Letzte Käufe</div>
+        ${s.transactions.length?s.transactions.map(t=>{
+            return'<div class="li"><div class="li-top"><div><div class="li-name">'+esc(t.articleName||'?')+'</div><div class="li-sub">'+fmtDate(t.date)+' '+(t.time||'')+(t.note?' · '+esc(t.note):'')+'</div></div><div class="li-right"><div style="font-weight:800;color:var(--red)">−'+t.quantity+'</div></div></div></div>';
+        }).join(''):'<div class="empty">Noch keine Käufe</div>'}`;
 }
 
 // === BESTAND ===

@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 app = Flask(__name__, static_folder='.', static_url_path='')
 DATA_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -125,6 +125,86 @@ def delete_expense(eid):
     data = [e for e in data if e.get('id') != eid]
     save_json('expenses', data)
     return jsonify({'ok': True})
+
+
+# --- Kunden ---
+
+@app.route('/api/customers', methods=['GET'])
+def get_customers():
+    return jsonify(load_json('customers'))
+
+
+@app.route('/api/customers', methods=['POST'])
+def create_customer():
+    body = request.get_json()
+    data = load_json('customers')
+    body['id'] = next_id(data)
+    body['created'] = datetime.now().isoformat()
+    data.insert(0, body)
+    save_json('customers', data)
+    return jsonify(body), 201
+
+
+@app.route('/api/customers/<int:cid>', methods=['PUT'])
+def update_customer(cid):
+    body = request.get_json()
+    data = load_json('customers')
+    for i, e in enumerate(data):
+        if e.get('id') == cid:
+            body['id'] = cid
+            body['created'] = e.get('created', '')
+            data[i] = body
+            break
+    save_json('customers', data)
+    return jsonify(body)
+
+
+@app.route('/api/customers/<int:cid>', methods=['DELETE'])
+def delete_customer(cid):
+    data = load_json('customers')
+    data = [e for e in data if e.get('id') != cid]
+    save_json('customers', data)
+    return jsonify({'ok': True})
+
+
+@app.route('/api/customers/<int:cid>/stats', methods=['GET'])
+def customer_stats(cid):
+    txns = load_json('transactions')
+    articles = load_json('articles')
+    art_map = {a['id']: a for a in articles}
+
+    now = datetime.now()
+    today = now.strftime('%Y-%m-%d')
+    week_start = (now - timedelta(days=now.weekday())).strftime('%Y-%m-%d')
+    month_start = now.strftime('%Y-%m-01')
+    year_start = now.strftime('%Y-01-01')
+
+    customer_txns = [t for t in txns if t.get('customerId') == cid and t.get('type') == 'out']
+
+    def calc_total(tx_list):
+        total = 0
+        for t in tx_list:
+            art = art_map.get(t.get('articleId'))
+            price = art.get('sellPrice', 0) if art else t.get('price', 0)
+            total += price * t.get('quantity', 0)
+        return total
+
+    day_txns = [t for t in customer_txns if t.get('date', '') >= today]
+    week_txns = [t for t in customer_txns if t.get('date', '') >= week_start]
+    month_txns = [t for t in customer_txns if t.get('date', '') >= month_start]
+    year_txns = [t for t in customer_txns if t.get('date', '') >= year_start]
+
+    return jsonify({
+        'today': calc_total(day_txns),
+        'week': calc_total(week_txns),
+        'month': calc_total(month_txns),
+        'year': calc_total(year_txns),
+        'todayCount': len(day_txns),
+        'weekCount': len(week_txns),
+        'monthCount': len(month_txns),
+        'yearCount': len(year_txns),
+        'transactions': customer_txns[:50]
+    })
 
 
 # --- Berichte ---
