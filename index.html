@@ -512,7 +512,6 @@
         <div class="md-h"></div>
         <h2 id="mCustT">Neuer Kunde</h2>
         <div class="fg"><label>Name</label><input type="text" id="iCustName" placeholder="Kundenname"></div>
-        <div class="fg"><label>Telefon (optional)</label><input type="tel" id="iCustPhone" placeholder="z.B. 0176..." inputmode="tel"></div>
         <div class="fg"><label>Notiz (optional)</label><input type="text" id="iCustNote" placeholder="z.B. Stammkunde"></div>
         <button class="btn btn-p" onclick="saveCust()">Speichern</button>
         <button class="btn btn-c" onclick="cm(document.getElementById('mCust'))">Abbrechen</button>
@@ -818,7 +817,7 @@ function renderKunden(){
                     <div class="cust-avatar">${esc(initials)}</div>
                     <div>
                         <div class="li-name">${esc(c.name)}</div>
-                        <div class="li-sub">${c.phone?esc(c.phone)+' · ':''}${txCount} Käufe${c.note?' · '+esc(c.note):''}</div>
+                        <div class="li-sub">${txCount} Käufe${c.note?' · '+esc(c.note):''}</div>
                     </div>
                 </div>
                 <div class="li-right" style="display:flex;gap:6px">
@@ -840,11 +839,10 @@ function openCustModal(id){
     if(id){
         const c=customers.find(x=>x.id===id);if(!c)return;
         document.getElementById('iCustName').value=c.name||'';
-        document.getElementById('iCustPhone').value=c.phone||'';
         document.getElementById('iCustNote').value=c.note||'';
         t.textContent='Kunde bearbeiten';
     }else{
-        ['iCustName','iCustPhone','iCustNote'].forEach(x=>document.getElementById(x).value='');
+        ['iCustName','iCustNote'].forEach(x=>document.getElementById(x).value='');
         t.textContent='Neuer Kunde';
     }
     document.getElementById('mCust').classList.add('on');
@@ -853,7 +851,7 @@ function openCustModal(id){
 async function saveCust(){
     const name=document.getElementById('iCustName').value.trim();
     if(!name){toast('Name eingeben');return}
-    const body={name,phone:document.getElementById('iCustPhone').value.trim(),note:document.getElementById('iCustNote').value.trim()};
+    const body={name,note:document.getElementById('iCustNote').value.trim()};
     if(editCustId){await api('/api/customers/'+editCustId,'PUT',body);toast('Gespeichert')}
     else{await api('/api/customers','POST',body);toast('Kunde erstellt')}
     cm(document.getElementById('mCust'));await loadAll();renderKunden();
@@ -878,7 +876,6 @@ async function renderCustDetail(id){
         <div class="cust-detail-head">
             <div class="cust-avatar">${esc(initials)}</div>
             <h2>${esc(c.name)}</h2>
-            ${c.phone?'<div class="cust-phone">'+esc(c.phone)+'</div>':''}
             ${c.note?'<div class="cust-phone">'+esc(c.note)+'</div>':''}
         </div>
         <div class="st">Umsatz</div>
