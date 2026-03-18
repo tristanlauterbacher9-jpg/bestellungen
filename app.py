@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 import json
 import os
-import psycopg2
+import psycopg
 from datetime import datetime, timedelta
 
 app = Flask(__name__, static_folder='.', static_url_path='')
@@ -9,8 +9,7 @@ DATABASE_URL = os.environ.get('DATABASE_URL', '')
 
 
 def get_db():
-    conn = psycopg2.connect(DATABASE_URL)
-    conn.autocommit = True
+    conn = psycopg.connect(DATABASE_URL, autocommit=True)
     return conn
 
 
@@ -41,16 +40,22 @@ def load_json(name):
     cur.close()
     conn.close()
     if row:
-        return row[0] if isinstance(row[0], list) else json.loads(row[0])
+        d = row[0]
+        if isinstance(d, list):
+            return d
+        if isinstance(d, str):
+            return json.loads(d)
+        return list(d) if d else []
     return []
 
 
 def save_json(name, data):
+    j = json.dumps(data, ensure_ascii=False)
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
-        "INSERT INTO store (name, data) VALUES (%s, %s::jsonb) ON CONFLICT (name) DO UPDATE SET data = %s::jsonb",
-        (name, json.dumps(data, ensure_ascii=False), json.dumps(data, ensure_ascii=False))
+        "INSERT INTO store (name, data) VALUES (%s, %s::jsonb) ON CONFLICT (name) DO UPDATE SET data = EXCLUDED.data",
+        (name, j)
     )
     cur.close()
     conn.close()
