@@ -462,10 +462,6 @@
             <label>Kategorie</label>
             <select id="iCat"></select>
         </div>
-        <div class="fg-row">
-            <div class="fg"><label>Einkaufspreis</label><input type="number" id="iEK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
-            <div class="fg"><label>Verkaufspreis</label><input type="number" id="iVK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
-        </div>
         <button class="btn btn-p" onclick="saveArt()">Speichern</button>
         <button class="btn btn-c" onclick="cm(document.getElementById('mArt'))">Abbrechen</button>
     </div>
@@ -528,10 +524,14 @@
 <div class="mo" id="mKat" onclick="if(event.target===this)cm(this)">
     <div class="md">
         <div class="md-h"></div>
-        <h2>Neue Kategorie</h2>
+        <h2 id="mKatT">Neue Kategorie</h2>
         <div class="fg"><label>Name</label><input type="text" id="iKatName" placeholder="z.B. Fumot 12k"></div>
+        <div class="fg-row">
+            <div class="fg"><label>Einkaufspreis</label><input type="number" id="iKatEK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
+            <div class="fg"><label>Verkaufspreis</label><input type="number" id="iKatVK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
+        </div>
         <div class="fg"><label>Mindestbestand</label><input type="number" id="iKatMin" placeholder="10" min="0" inputmode="numeric" value="10"></div>
-        <button class="btn btn-p" onclick="saveKat()">Erstellen</button>
+        <button class="btn btn-p" onclick="saveKat()">Speichern</button>
         <button class="btn btn-c" onclick="cm(document.getElementById('mKat'))">Abbrechen</button>
     </div>
 </div>
@@ -639,29 +639,23 @@ function renderKat(){
     if(!catList.length){list.innerHTML='<div class="empty">Keine Kategorien vorhanden.<br>Tippe + um eine neue anzulegen.</div>';return}
 
     list.innerHTML=catList.map((c,ci)=>{
-        const cls=c.stock===0?'out':c.stock<=c.minStock?'low':'ok';
+        const cs=catstock.find(x=>x.category===c.name);
+        const ek=cs?cs.price||0:0;
+        const vk=cs?cs.sellPrice||0:0;
         const filteredItems=q?c.items.filter(a=>a.name.toLowerCase().includes(q)||c.name.toLowerCase().includes(q)):c.items;
         return`<div class="cat-card" id="kcat-${ci}">
             <div class="cat-header" onclick="toggleKCat(${ci})">
                 <div>
                     <div class="cat-name">${esc(c.name)}</div>
-                    <div class="cat-count">${c.items.length} Geschmäcker</div>
+                    <div class="cat-count">${c.items.length} Geschmäcker${ek||vk?' · EK '+money(ek)+' · VK '+money(vk):''}</div>
                 </div>
                 <div class="cat-right">
-                    <div class="cat-stock ${cls}">${c.stock}</div>
-                    <div class="q-btns" style="margin-left:6px">
-                        <button class="q-btn minus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','out')">−</button>
-                        <button class="q-btn plus" onclick="event.stopPropagation();quickStock('${c.name.replace(/'/g,"\\'")}','in')">+</button>
-                    </div>
                     <svg class="cat-chevron" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
                 </div>
             </div>
             <div class="cat-items">
-                ${filteredItems.map(a=>`<div class="cat-item" style="flex-wrap:wrap">
-                    <div style="flex:1">
-                        <div class="ci-name">${esc(a.name)}</div>
-                        <div class="ci-price">${a.barcode?esc(a.barcode)+' · ':''}EK ${money(a.price)} · VK ${money(a.sellPrice||0)}</div>
-                    </div>
+                ${filteredItems.map(a=>`<div class="cat-item">
+                    <div class="ci-name">${esc(a.name)}</div>
                     <div style="display:flex;gap:4px">
                         <button class="q-btn" onclick="openArtModal(${a.id})" style="border-color:var(--blue);color:var(--blue);width:28px;height:28px;font-size:.7rem">
                             <svg viewBox="0 0 24 24" style="width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -675,9 +669,10 @@ function renderKat(){
                     <svg viewBox="0 0 24 24" style="width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     Geschmack hinzufügen
                 </div>
-            </div>
-            <div style="padding:6px 16px 10px;display:flex;justify-content:flex-end">
-                <button style="background:none;border:none;color:var(--red);font-size:.72rem;font-weight:600;cursor:pointer;padding:4px 8px" onclick="delKat('${c.name.replace(/'/g,"\\'")}')">Kategorie löschen</button>
+                <div class="cat-item" style="justify-content:space-between">
+                    <button style="background:none;border:none;color:var(--blue);font-size:.78rem;font-weight:600;cursor:pointer;padding:4px 0" onclick="event.stopPropagation();openKatModal('${c.name.replace(/'/g,"\\'")}')">Kategorie bearbeiten</button>
+                    <button style="background:none;border:none;color:var(--red);font-size:.78rem;font-weight:600;cursor:pointer;padding:4px 0" onclick="event.stopPropagation();delKat('${c.name.replace(/'/g,"\\'")}')">Löschen</button>
+                </div>
             </div>
         </div>`;
     }).join('');
@@ -685,20 +680,44 @@ function renderKat(){
 
 function toggleKCat(i){document.getElementById('kcat-'+i).classList.toggle('open')}
 
-function openKatModal(){
-    document.getElementById('iKatName').value='';
-    document.getElementById('iKatMin').value='10';
+function openKatModal(editName){
+    window._editKatName=editName||null;
+    const nameInput=document.getElementById('iKatName');
+    if(editName){
+        const cs=catstock.find(c=>c.category===editName);
+        nameInput.value=editName;
+        document.getElementById('iKatEK').value=cs?cs.price||'':'';
+        document.getElementById('iKatVK').value=cs?cs.sellPrice||'':'';
+        document.getElementById('iKatMin').value=cs?cs.minStock||10:10;
+        document.getElementById('mKatT').textContent='Kategorie bearbeiten';
+    }else{
+        nameInput.value='';
+        document.getElementById('iKatEK').value='';
+        document.getElementById('iKatVK').value='';
+        document.getElementById('iKatMin').value='10';
+        document.getElementById('mKatT').textContent='Neue Kategorie';
+    }
     document.getElementById('mKat').classList.add('on');
 }
 
 async function saveKat(){
     const name=document.getElementById('iKatName').value.trim();
     if(!name){toast('Name eingeben');return}
-    const existing=catstock.find(c=>c.category===name);
-    if(existing){toast('Kategorie existiert bereits');return}
+    const ek=parseFloat(document.getElementById('iKatEK').value)||0;
+    const vk=parseFloat(document.getElementById('iKatVK').value)||0;
     const minStock=parseInt(document.getElementById('iKatMin').value)||10;
-    await api('/api/catstock','POST',{category:name,stock:0,minStock});
-    toast('Kategorie erstellt');
+
+    if(window._editKatName){
+        // Update existing
+        const cs=catstock.find(c=>c.category===window._editKatName);
+        await api('/api/catstock','POST',{category:window._editKatName,stock:cs?cs.stock||0:0,minStock,price:ek,sellPrice:vk});
+        toast('Gespeichert');
+    }else{
+        const existing=catstock.find(c=>c.category===name);
+        if(existing){toast('Kategorie existiert bereits');return}
+        await api('/api/catstock','POST',{category:name,stock:0,minStock,price:ek,sellPrice:vk});
+        toast('Kategorie erstellt');
+    }
     cm(document.getElementById('mKat'));await loadAll();
 }
 
@@ -736,11 +755,9 @@ function openArtModal(id,preCategory){
         document.getElementById('iBarcode').value=a.barcode||'';
         document.getElementById('iName').value=a.name||'';
         catSel.value=a.category||'';
-        document.getElementById('iEK').value=a.price||'';
-        document.getElementById('iVK').value=a.sellPrice||'';
         t.textContent='Geschmack bearbeiten';
     }else{
-        ['iBarcode','iName','iEK','iVK'].forEach(x=>document.getElementById(x).value='');
+        ['iBarcode','iName'].forEach(x=>document.getElementById(x).value='');
         if(preCategory)catSel.value=preCategory;
         else if(cats.length)catSel.value=cats[0];
         t.textContent='Neuer Geschmack';
@@ -754,8 +771,7 @@ async function saveArt(){
     if(!name){toast('Name eingeben');return}
     const category=document.getElementById('iCat').value;
     if(!category){toast('Kategorie wählen');return}
-    const body={name,barcode:document.getElementById('iBarcode').value.trim(),category,
-        price:parseFloat(document.getElementById('iEK').value)||0,sellPrice:parseFloat(document.getElementById('iVK').value)||0};
+    const body={name,barcode:document.getElementById('iBarcode').value.trim(),category};
     if(editId){await api('/api/articles/'+editId,'PUT',body);toast('Gespeichert')}
     else{await api('/api/articles','POST',body);toast('Artikel erstellt')}
     cm(document.getElementById('mArt'));await loadAll();
@@ -1046,30 +1062,63 @@ function renderBestand(){
     const totalStock=catstock.reduce((s,c)=>s+(c.stock||0),0);
     document.getElementById('bestandTotalVal').textContent='Gesamtbestand: '+totalStock;
 
-    // Category tabs
+    // Category tabs: "Alle" + each category
     const cats=catstock.map(c=>c.category);
     const bf=window.bestandFilter||'';
     const tabsEl=document.getElementById('bestandTabs');
-    tabsEl.innerHTML=cats.map(c=>{
-        const active=bf===c||(bf===''&&cats[0]===c);
-        return`<button class="tab ${active?'on':''}" onclick="bestandFilter='${c.replace(/'/g,"\\'")}';renderBestand()">${esc(c)}</button>`;
-    }).join('');
-
-    // Auto-select first tab
-    const activeCat=bf||cats[0]||'';
-    if(!bf&&cats.length)window.bestandFilter=cats[0];
-
-    const items=articles.filter(a=>a.category===activeCat);
-    const cs=catstock.find(c=>c.category===activeCat);
-    const catStockVal=cs?cs.stock||0:0;
+    tabsEl.innerHTML=`<button class="tab ${!bf?'on':''}" onclick="bestandFilter='';renderBestand()">Alle</button>`+
+        cats.map(c=>{
+            const st=getCatStock(c);
+            return`<button class="tab ${bf===c?'on':''}" onclick="bestandFilter='${c.replace(/'/g,"\\'")}';renderBestand()">${esc(c)}</button>`;
+        }).join('');
 
     const list=document.getElementById('bestandList');
-    if(!items.length&&!activeCat){list.innerHTML='<div class="empty">Keine Kategorien vorhanden</div>';return}
 
-    list.innerHTML=items.map(a=>`<div class="bestand-row">
-        <div class="br-name">${esc(activeCat)} · ${esc(a.name)}</div>
-        <div class="br-stock">${catStockVal}</div>
-    </div>`).join('')||'<div class="empty">Keine Geschmäcker in dieser Kategorie</div>';
+    if(!bf){
+        // "Alle" — show each category as a row with its total stock (clickable)
+        if(!catstock.length){list.innerHTML='<div class="empty">Keine Kategorien vorhanden</div>';return}
+        list.innerHTML=catstock.map(cs=>`<div class="bestand-row" style="cursor:pointer" onclick="bestandFilter='${cs.category.replace(/'/g,"\\'")}';renderBestand()">
+            <div class="br-name">${esc(cs.category)}</div>
+            <div class="br-stock" style="cursor:pointer">${cs.stock||0}</div>
+        </div>`).join('');
+    }else{
+        // Single category — show each flavor with the category stock (editable)
+        const items=articles.filter(a=>a.category===bf);
+        const cs=catstock.find(c=>c.category===bf);
+        const catStockVal=cs?cs.stock||0:0;
+
+        const header=`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding:0 4px">
+            <div>
+                <div style="font-weight:700;font-size:.95rem">${esc(bf)}</div>
+                <div style="font-size:.72rem;color:var(--text2)">${items.length} Geschmäcker</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px">
+                <button class="q-btn minus" onclick="quickStock('${bf.replace(/'/g,"\\'")}','out')" style="width:36px;height:36px;font-size:1.2rem">−</button>
+                <div style="font-size:1.5rem;font-weight:900;min-width:40px;text-align:center;cursor:pointer;color:var(--accent)" onclick="editCatStockPrompt('${bf.replace(/'/g,"\\'")}')">
+                    ${catStockVal}
+                </div>
+                <button class="q-btn plus" onclick="quickStock('${bf.replace(/'/g,"\\'")}','in')" style="width:36px;height:36px;font-size:1.2rem">+</button>
+            </div>
+        </div>`;
+
+        if(!items.length){list.innerHTML=header+'<div class="empty">Keine Geschmäcker</div>';return}
+
+        list.innerHTML=header+items.map(a=>`<div class="bestand-row">
+            <div class="br-name">${esc(bf)} · ${esc(a.name)}</div>
+            <div class="br-stock">${catStockVal}</div>
+        </div>`).join('');
+    }
+}
+
+function editCatStockPrompt(catName){
+    const cs=catstock.find(c=>c.category===catName);
+    const current=cs?cs.stock||0:0;
+    const val=prompt('Bestand für '+catName+' setzen:',current);
+    if(val===null)return;
+    const num=parseInt(val);
+    if(isNaN(num)||num<0){toast('Ungültige Zahl');return}
+    api('/api/catstock','POST',{category:catName,stock:num,minStock:cs?cs.minStock||10:10,price:cs?cs.price||0:0,sellPrice:cs?cs.sellPrice||0:0})
+        .then(()=>{toast('Bestand gesetzt: '+num);return loadAll()});
 }
 
 // === SCANNER ===

@@ -300,12 +300,18 @@ def set_catstock():
         if entry.get('category') == body.get('category'):
             entry['stock'] = body.get('stock', entry.get('stock', 0))
             entry['minStock'] = body.get('minStock', entry.get('minStock', 10))
+            if 'price' in body:
+                entry['price'] = body['price']
+            if 'sellPrice' in body:
+                entry['sellPrice'] = body['sellPrice']
             found = True
             break
     if not found:
         body['id'] = next_id(data)
         body.setdefault('stock', 0)
         body.setdefault('minStock', 10)
+        body.setdefault('price', 0)
+        body.setdefault('sellPrice', 0)
         data.append(body)
     save_json('catstock', data)
     return jsonify(body)
