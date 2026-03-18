@@ -8,6 +8,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a">
     <title>Lager und Inventar</title>
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
     <style>
         *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
         :root{
@@ -183,6 +184,29 @@
         .fab:active{transform:scale(0.88)}
         .fab.hidden{display:none}
 
+        /* Scanner */
+        .scanner-container{
+            width:100%;border-radius:16px;overflow:hidden;
+            background:#000;margin-bottom:16px;position:relative;
+        }
+        .scanner-container video{width:100%;display:block;border-radius:16px}
+        #scanner-region{width:100%}
+        #scanner-region video{border-radius:16px!important}
+        #scanner-region img[alt="Info icon"]{display:none!important}
+        .scan-result{
+            background:var(--card);border-radius:14px;padding:18px;margin-top:14px;
+            text-align:center;
+        }
+        .scan-result .scan-code{
+            font-size:1.4rem;font-weight:700;color:var(--accent);
+            font-family:monospace;margin:8px 0;word-break:break-all;
+        }
+        .scan-result .scan-article{
+            margin-top:12px;padding:14px;background:var(--bg);border-radius:12px;text-align:left;
+        }
+        .scan-actions{display:flex;gap:8px;margin-top:14px}
+        .scan-actions .btn{flex:1}
+
         /* Delete action */
         .del-btn{
             background:rgba(255,71,87,0.15);color:var(--danger);border:none;
@@ -231,6 +255,10 @@
             <svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
             <div class="label">Neuer Ausgang</div>
         </div>
+        <div class="dash-card" onclick="showPage('scanner')" style="grid-column:1/-1">
+            <svg viewBox="0 0 24 24"><path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/><path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/><line x1="7" y1="12" x2="17" y2="12"/><line x1="7" y1="8" x2="10" y2="8"/><line x1="7" y1="16" x2="10" y2="16"/><line x1="13" y1="8" x2="17" y2="8"/><line x1="13" y1="16" x2="17" y2="16"/></svg>
+            <div class="label">Barcode scannen</div>
+        </div>
     </div>
 </div>
 
@@ -262,6 +290,14 @@
     <div id="expenseList"></div>
 </div>
 
+<!-- ===== SCANNER ===== -->
+<div class="page" id="page-scanner">
+    <div class="scanner-container">
+        <div id="scanner-region"></div>
+    </div>
+    <div id="scanResult"></div>
+</div>
+
 <!-- FAB -->
 <button class="fab" id="fab" onclick="handleFab()">+</button>
 
@@ -290,6 +326,13 @@
     <div class="modal">
         <div class="modal-handle"></div>
         <h2 id="modalArticleTitle">Neuer Artikel</h2>
+        <div class="form-group">
+            <label>Barcode / EAN</label>
+            <div style="display:flex;gap:8px">
+                <input type="text" id="artBarcode" placeholder="Barcode eingeben oder scannen" style="flex:1">
+                <button type="button" class="btn-small" style="background:var(--accent);color:#000" onclick="scanForArticle()">Scan</button>
+            </div>
+        </div>
         <div class="form-group">
             <label>Artikelname</label>
             <input type="text" id="artName" placeholder="z.B. Fumot 15k Triple Berry">
@@ -390,7 +433,8 @@
     // === Navigation ===
     const titles={
         dashboard:'Lager und Inventar',articles:'Artikel',
-        receipts:'Belege',reports:'Berichte',expenses:'Ausgaben'
+        receipts:'Belege',reports:'Berichte',expenses:'Ausgaben',
+        scanner:'Barcode Scanner'
     };
 
     function showPage(p){
@@ -402,12 +446,14 @@
             b.classList.toggle('active',b.dataset.page===p));
 
         const fab=document.getElementById('fab');
-        fab.classList.toggle('hidden',p==='dashboard'||p==='reports');
+        fab.classList.toggle('hidden',p==='dashboard'||p==='reports'||p==='scanner');
 
         if(p==='articles')renderArticles();
         if(p==='receipts')renderReceipts();
         if(p==='reports')renderReports();
         if(p==='expenses')renderExpenses();
+        if(p==='scanner')startScanner();
+        else stopScanner();
     }
 
     function updateDashCounts(){
@@ -432,6 +478,7 @@
         if(id){
             const a=articles.find(x=>x.id===id);
             if(!a)return;
+            document.getElementById('artBarcode').value=a.barcode||'';
             document.getElementById('artName').value=a.name||'';
             document.getElementById('artCategory').value=a.category||'';
             document.getElementById('artPrice').value=a.price||'';
@@ -440,7 +487,7 @@
             document.getElementById('artMinStock').value=a.minStock||5;
             t.textContent='Artikel bearbeiten';
         }else{
-            ['artName','artCategory','artPrice','artSellPrice','artStock'].forEach(
+            ['artBarcode','artName','artCategory','artPrice','artSellPrice','artStock'].forEach(
                 x=>document.getElementById(x).value='');
             document.getElementById('artMinStock').value='5';
             t.textContent='Neuer Artikel';
@@ -453,6 +500,7 @@
         if(!name){toast('Bitte Name eingeben');return}
         const body={
             name,
+            barcode:document.getElementById('artBarcode').value.trim(),
             category:document.getElementById('artCategory').value.trim(),
             price:parseFloat(document.getElementById('artPrice').value)||0,
             sellPrice:parseFloat(document.getElementById('artSellPrice').value)||0,
@@ -480,7 +528,8 @@
         const q=(document.getElementById('articleSearch').value||'').toLowerCase();
         const filtered=articles.filter(a=>
             a.name.toLowerCase().includes(q)||
-            (a.category||'').toLowerCase().includes(q)
+            (a.category||'').toLowerCase().includes(q)||
+            (a.barcode||'').toLowerCase().includes(q)
         );
         const list=document.getElementById('articleList');
         if(!filtered.length){
@@ -491,7 +540,7 @@
             return `<div class="list-item" onclick="openArticleModal(${a.id})">
                 <div class="list-left">
                     <div class="list-title">${esc(a.name)}</div>
-                    <div class="list-sub">${esc(a.category||'Ohne Kategorie')} · EK ${money(a.price)} · VK ${money(a.sellPrice)}</div>
+                    <div class="list-sub">${a.barcode?'<span style="font-family:monospace">'+esc(a.barcode)+'</span> · ':''}${esc(a.category||'Ohne Kategorie')} · EK ${money(a.price)} · VK ${money(a.sellPrice)}</div>
                 </div>
                 <div class="list-right">
                     <div class="list-stock ${cls}">${a.stock}</div>
@@ -665,6 +714,133 @@
     function formatDate(d){
         if(!d)return'-';
         const[y,m,day]=d.split('-');return`${day}.${m}.${y}`;
+    }
+
+    // === BARCODE SCANNER ===
+    let scanner=null;
+    let scannerRunning=false;
+
+    function startScanner(){
+        document.getElementById('scanResult').innerHTML='';
+        if(scannerRunning)return;
+
+        scanner=new Html5Qrcode('scanner-region');
+        scanner.start(
+            {facingMode:'environment'},
+            {fps:10,qrbox:{width:250,height:150},aspectRatio:1.0},
+            onScanSuccess,
+            ()=>{}
+        ).then(()=>{
+            scannerRunning=true;
+        }).catch(err=>{
+            document.getElementById('scanResult').innerHTML=
+                `<div class="scan-result"><p>Kamera konnte nicht gestartet werden.</p>
+                <p style="font-size:0.8rem;color:var(--text-muted);margin-top:8px">${err}</p></div>`;
+        });
+    }
+
+    function stopScanner(){
+        if(scanner&&scannerRunning){
+            scanner.stop().then(()=>{
+                scanner.clear();
+                scannerRunning=false;
+            }).catch(()=>{scannerRunning=false});
+        }
+    }
+
+    function onScanSuccess(code){
+        // Vibrieren wenn möglich
+        if(navigator.vibrate)navigator.vibrate(100);
+
+        // Artikel suchen
+        const found=articles.find(a=>(a.barcode||'')===code);
+        const result=document.getElementById('scanResult');
+
+        if(found){
+            const cls=found.stock===0?'out':found.stock<=found.minStock?'low':'ok';
+            result.innerHTML=`
+                <div class="scan-result">
+                    <div style="font-size:0.8rem;color:var(--text-muted)">Barcode erkannt</div>
+                    <div class="scan-code">${esc(code)}</div>
+                    <div class="scan-article">
+                        <div class="list-title">${esc(found.name)}</div>
+                        <div class="list-sub" style="margin-top:4px">${esc(found.category||'')} · EK ${money(found.price)} · VK ${money(found.sellPrice)}</div>
+                        <div style="margin-top:8px;font-weight:700">Bestand: <span class="list-stock ${cls}">${found.stock}</span></div>
+                    </div>
+                    <div class="scan-actions">
+                        <button class="btn btn-primary" onclick="scanStockIn(${found.id})">+ Eingang</button>
+                        <button class="btn btn-cancel" onclick="scanStockOut(${found.id})">- Ausgang</button>
+                    </div>
+                    <button class="btn btn-cancel" style="margin-top:8px" onclick="resumeScanner()">Weiter scannen</button>
+                </div>`;
+        }else{
+            result.innerHTML=`
+                <div class="scan-result">
+                    <div style="font-size:0.8rem;color:var(--warn)">Unbekannter Barcode</div>
+                    <div class="scan-code">${esc(code)}</div>
+                    <div class="scan-actions">
+                        <button class="btn btn-primary" onclick="createFromBarcode('${code}')">Artikel anlegen</button>
+                        <button class="btn btn-cancel" onclick="resumeScanner()">Weiter scannen</button>
+                    </div>
+                </div>`;
+        }
+
+        // Scanner pausieren
+        if(scanner&&scannerRunning){
+            scanner.pause(true);
+        }
+    }
+
+    function resumeScanner(){
+        document.getElementById('scanResult').innerHTML='';
+        if(scanner&&scannerRunning){
+            scanner.resume();
+        }
+    }
+
+    async function scanStockIn(articleId){
+        const article=articles.find(a=>a.id===articleId);
+        await api('/api/transactions','POST',{
+            type:'in',articleId,quantity:1,note:'Barcode Scan',
+            articleName:article?article.name:''
+        });
+        toast('Eingang +1 gebucht');
+        await loadAll();
+        resumeScanner();
+    }
+
+    async function scanStockOut(articleId){
+        const article=articles.find(a=>a.id===articleId);
+        if(article&&article.stock<1){toast('Nicht auf Lager');return}
+        await api('/api/transactions','POST',{
+            type:'out',articleId,quantity:1,note:'Barcode Scan',
+            articleName:article?article.name:''
+        });
+        toast('Ausgang -1 gebucht');
+        await loadAll();
+        resumeScanner();
+    }
+
+    function createFromBarcode(code){
+        stopScanner();
+        showPage('articles');
+        setTimeout(()=>{
+            openArticleModal();
+            document.getElementById('artBarcode').value=code;
+        },300);
+    }
+
+    // Scan-Button im Artikel-Modal
+    function scanForArticle(){
+        closeModal('modalArticle');
+        const origCat=document.getElementById('artCategory').value;
+        const origName=document.getElementById('artName').value;
+        showPage('scanner');
+
+        // Override scan handler temporär
+        const origHandler=onScanSuccess;
+        window._scanForArticleMode=true;
+        window._scanOrigData={name:origName,category:origCat,editId:editArticleId};
     }
 
     // === Init ===
