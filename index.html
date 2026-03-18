@@ -458,8 +458,13 @@
                 <button type="button" style="padding:0 14px;border-radius:10px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:.8rem;font-weight:600;cursor:pointer" onclick="cm(document.getElementById('mArt'));nav('scan')">Scan</button>
             </div>
         </div>
-        <div class="fg"><label>Name</label><input type="text" id="iName" placeholder="Artikelname"></div>
-        <div class="fg"><label>Kategorie</label><input type="text" id="iCat" placeholder="z.B. Fumot 15k"></div>
+        <div class="fg"><label>Geschmack / Name</label><input type="text" id="iName" placeholder="z.B. Triple Berry"></div>
+        <div class="fg">
+            <label>Kategorie</label>
+            <select id="iCat" onchange="if(this.value==='__new__'){this.style.display='none';document.getElementById('iCatNew').style.display='';document.getElementById('iCatNew').focus()}">
+            </select>
+            <input type="text" id="iCatNew" placeholder="Neue Kategorie eingeben..." style="display:none;margin-top:6px;width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text);font-size:.95rem;outline:none">
+        </div>
         <div class="fg-row">
             <div class="fg"><label>Einkaufspreis</label><input type="number" id="iEK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
             <div class="fg"><label>Verkaufspreis</label><input type="number" id="iVK" placeholder="0.00" step="0.01" min="0" inputmode="decimal"></div>
@@ -656,22 +661,35 @@ async function quickStock(id,type){
     await loadAll();
 }
 
-function openArtModal(id){
+function openArtModal(id,preCategory){
     editId=id||null;
     const t=document.getElementById('mArtT');
+    const catSel=document.getElementById('iCat');
+    const catNew=document.getElementById('iCatNew');
+    catNew.style.display='none';catNew.value='';
+    catSel.style.display='';
+
+    // Build category dropdown from existing categories
+    const cats=[...new Set(articles.map(a=>a.category).filter(Boolean))];
+    catSel.innerHTML=cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('')+
+        '<option value="__new__">+ Neue Kategorie...</option>';
+
     if(id){
         const a=articles.find(x=>x.id===id);if(!a)return;
         document.getElementById('iBarcode').value=a.barcode||'';
         document.getElementById('iName').value=a.name||'';
-        document.getElementById('iCat').value=a.category||'';
+        catSel.value=a.category||'';
+        if(a.category&&!cats.includes(a.category)){catNew.value=a.category;catNew.style.display='';catSel.style.display='none'}
         document.getElementById('iEK').value=a.price||'';
         document.getElementById('iVK').value=a.sellPrice||'';
         document.getElementById('iStock').value=a.stock||0;
         document.getElementById('iMin').value=a.minStock||5;
         t.textContent='Artikel bearbeiten';
     }else{
-        ['iBarcode','iName','iCat','iEK','iVK','iStock'].forEach(x=>document.getElementById(x).value='');
+        ['iBarcode','iName','iEK','iVK','iStock'].forEach(x=>document.getElementById(x).value='');
         document.getElementById('iMin').value='5';
+        if(preCategory){catSel.value=preCategory}
+        else if(cats.length){catSel.value=cats[0]}
         t.textContent='Neuer Artikel';
     }
     document.getElementById('mArt').classList.add('on');
@@ -680,7 +698,11 @@ function openArtModal(id){
 async function saveArt(){
     const name=document.getElementById('iName').value.trim();
     if(!name){toast('Name eingeben');return}
-    const body={name,barcode:document.getElementById('iBarcode').value.trim(),category:document.getElementById('iCat').value.trim(),
+    const catSel=document.getElementById('iCat');
+    const catNew=document.getElementById('iCatNew');
+    const category=(catSel.value==='__new__'||catSel.style.display==='none')?catNew.value.trim():catSel.value;
+    if(!category){toast('Kategorie wählen');return}
+    const body={name,barcode:document.getElementById('iBarcode').value.trim(),category,
         price:parseFloat(document.getElementById('iEK').value)||0,sellPrice:parseFloat(document.getElementById('iVK').value)||0,
         stock:parseInt(document.getElementById('iStock').value)||0,minStock:parseInt(document.getElementById('iMin').value)||5};
     if(editId){await api('/api/articles/'+editId,'PUT',body);toast('Gespeichert')}
