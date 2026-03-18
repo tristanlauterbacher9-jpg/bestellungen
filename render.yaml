@@ -4,7 +4,7 @@ services:
     runtime: python
     branch: master
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn website:app --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
     plan: free
     envVars:
       - key: PORT
