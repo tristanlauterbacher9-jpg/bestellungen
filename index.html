@@ -815,14 +815,10 @@ function openStockModal(type,preselect,preselectCust){
         return`<option value="${esc(c)}"${c===preselectCat?' selected':''}>${esc(c)} (${st})</option>`;
     }).join('');
 
-    // Show flavor picker for Ausgang
+    // Show flavor picker for both Eingang and Ausgang
     const fgFlavor=document.getElementById('fgFlavor');
-    if(type==='out'){
-        fgFlavor.style.display='';
-        onStockCatChange(preselect);
-    }else{
-        fgFlavor.style.display='none';
-    }
+    fgFlavor.style.display='';
+    onStockCatChange(preselect);
 
     // Customer select for Ausgang
     const fgC=document.getElementById('fgCust');
@@ -851,18 +847,20 @@ async function saveStock(){
     const date=document.getElementById('iStockDate').value;
     const catStockVal=getCatStock(catName);
 
-    if(stockType==='out'&&catStockVal<stockQty){toast('Nicht genug auf Lager ('+catStockVal+')');return}
+    // Get selected flavor
+    const aid=parseInt(document.getElementById('iStockFlavor').value);
+    const a=articles.find(x=>x.id===aid);
+    const flavorName=a?a.name:'';
 
-    let aid=null,flavorName='';
     if(stockType==='out'){
-        aid=parseInt(document.getElementById('iStockFlavor').value);
-        const a=articles.find(x=>x.id===aid);
-        flavorName=a?a.name:'';
+        // Check article-level stock for Ausgang
+        const artStock=a?(a.stock||0):catStockVal;
+        if(artStock<stockQty){toast('Nicht genug auf Lager ('+artStock+')');return}
     }
 
     const body={type:stockType,quantity:stockQty,note,date,categoryName:catName,
-        articleName:stockType==='out'?catName+' — '+flavorName:catName,
-        articleId:aid};
+        articleName:catName+' — '+flavorName,
+        articleId:aid||null};
 
     if(stockType==='out'){
         const custId=parseInt(document.getElementById('iStockCust').value);

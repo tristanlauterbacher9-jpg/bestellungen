@@ -112,32 +112,39 @@ def create_transaction():
     txns.insert(0, body)
     save_json('transactions', txns)
 
-    # Update category stock
+    # Update article stock
+    aid = body.get('articleId')
+    qty = body.get('quantity', 0)
     cat_name = body.get('categoryName', '')
-    if not cat_name:
-        articles = load_json('articles')
-        for a in articles:
-            if a.get('id') == body.get('articleId'):
-                cat_name = a.get('category', '')
-                break
+    articles = load_json('articles')
 
+    if aid:
+        for a in articles:
+            if a.get('id') == aid:
+                if not cat_name:
+                    cat_name = a.get('category', '')
+                if body.get('type') == 'in':
+                    a['stock'] = a.get('stock', 0) + qty
+                else:
+                    a['stock'] = max(0, a.get('stock', 0) - qty)
+                break
+        save_json('articles', articles)
+
+    # Sync category stock from article totals
     if cat_name:
+        cat_total = sum(a.get('stock', 0) for a in articles if a.get('category') == cat_name)
         catstock = load_json('catstock')
         found = False
-        qty = body.get('quantity', 0)
         for cs in catstock:
             if cs.get('category') == cat_name:
-                if body.get('type') == 'in':
-                    cs['stock'] = cs.get('stock', 0) + qty
-                else:
-                    cs['stock'] = max(0, cs.get('stock', 0) - qty)
+                cs['stock'] = cat_total
                 found = True
                 break
         if not found:
             catstock.append({
                 'id': next_id(catstock),
                 'category': cat_name,
-                'stock': qty if body.get('type') == 'in' else 0,
+                'stock': cat_total,
                 'minStock': 10
             })
         save_json('catstock', catstock)
@@ -156,8 +163,34 @@ def delete_transaction(tid):
     if deleted:
         t = deleted[0]
         cat_name = t.get('categoryName', '')
+        aid = t.get('articleId')
         qty = t.get('quantity', 0)
-        if cat_name and qty:
+
+        # Reverse article stock
+        if aid and qty:
+            articles = load_json('articles')
+            for a in articles:
+                if a.get('id') == aid:
+                    if not cat_name:
+                        cat_name = a.get('category', '')
+                    if t.get('type') == 'in':
+                        a['stock'] = max(0, a.get('stock', 0) - qty)
+                    else:
+                        a['stock'] = a.get('stock', 0) + qty
+                    break
+            save_json('articles', articles)
+
+            # Sync category stock from article totals
+            if cat_name:
+                cat_total = sum(a.get('stock', 0) for a in articles if a.get('category') == cat_name)
+                catstock = load_json('catstock')
+                for cs in catstock:
+                    if cs.get('category') == cat_name:
+                        cs['stock'] = cat_total
+                        break
+                save_json('catstock', catstock)
+
+        elif cat_name and qty:
             catstock = load_json('catstock')
             for cs in catstock:
                 if cs.get('category') == cat_name:
